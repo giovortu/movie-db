@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Database</title>
+    <!-- Materialize CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            min-height: 100vh;
+            flex-direction: column;
+            background-color: #f5f5f5;
+        }
+        main {
+            flex: 1 0 auto;
+            padding: 20px 0;
+        }
+        /* Card View Styles */
+        .movie-card {
+            transition: all 0.3s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .movie-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+        }
+        .search-container {
+            margin: 20px 0 40px 0;
+        }
+        .movie-title {
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+        .movie-meta {
+            color: #757575;
+            font-size: 0.9rem;
+        }
+        .movie-meta i {
+            vertical-align: bottom;
+            margin-right: 5px;
+            font-size: 1.1rem;
+        }
+        .pagination li.active {
+            background-color: #ee6e73;
+        }
+        .card .card-content {
+            padding: 20px;
+            flex-grow: 1;
+        }
+        .card .card-action {
+            padding: 15px 20px;
+        }
+        .toast {
+            background-color: #4caf50;
+        }
+        
+        /* List View Styles */
+        .responsive-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            box-shadow: 0 2px 2px 0 rgba(0,0,0,0.14), 0 3px 1px -2px rgba(0,0,0,0.12), 0 1px 5px 0 rgba(0,0,0,0.2);
+        }
+        .responsive-table th {
+            background-color: #ee6e73;
+            color: white;
+            padding: 12px 15px;
+            text-align: left;
+        }
+        .responsive-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .responsive-table tr:hover {
+            background-color: #f5f5f5;
+        }
+        .truncate {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block;
+        }
+        
+        /* View and Sort Controls */
+        .controls-row {
+            margin-bottom: 20px;
+        }
+        .view-toggle-container {
+            text-align: right;
+        }
+        .switch {
+            display: inline-block;
+        }
+        .switch i.material-icons {
+            vertical-align: middle;
+            margin: 0 5px;
+            color: #ee6e73;
+        }
+        
+        /* Export dropdown styles */
+        .dropdown-content li > a {
+            color: #ee6e73;
+        }
+        .dropdown-content li > a > i {
+            margin-right: 10px;
+        }
+        .dropdown-content {
+            min-width: 200px;
+        }
+        
+        /* Responsive adjustments */
+        @media only screen and (max-width: 600px) {
+            .responsive-table td, .responsive-table th {
+                padding: 8px 5px;
+                font-size: 0.8rem;
+            }
+            .truncate {
+                max-width: 100px;
+            }
+            .controls-row .col {
+                padding: 5px;
+            }
+            .brand-logo {
+                font-size: 1.2rem !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <nav class="pink lighten-1">
+            <div class="nav-wrapper container">
+                <a href="/" class="brand-logo">MovieDB</a>
+                <ul id="nav-mobile" class="right hide-on-med-and-down">
+                    <li><a href="/"><i class="material-icons left">home</i>Home</a></li>
+                    <li>
+                        <a class='dropdown-trigger' href='#' data-target='export-dropdown'>
+                            <i class="material-icons left">file_download</i>Export
+                        </a>
+                    </li>
+                    <li><a href="#" onclick="document.getElementById('update-form').submit()">
+                        <i class="material-icons left">refresh</i>Update
+                    </a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Dropdown Structure -->
+        <ul id='export-dropdown' class='dropdown-content'>
+            <li><a href="/export/json"><i class="material-icons">code</i>JSON (Full Metadata)</a></li>
+            <li><a href="/export/csv"><i class="material-icons">table_chart</i>CSV (Title + Path)</a></li>
+        </ul>
+    </header>
+
+    <main class="container">
+        <!-- Search Box -->
+        <div class="row search-container">
+            <form action="/" method="get">
+                <div class="col s12 m8 offset-m2">
+                    <div class="card-panel pink lighten-5">
+                        <div class="row valign-wrapper">
+                            <div class="input-field col s10">
+                                <i class="material-icons prefix">search</i>
+                                <input id="search" type="text" name="search" value="{{ search_query }}">
+                                <label for="search">Search movies...</label>
+                            </div>
+                            <div class="col s2 right-align">
+                                <button class="btn waves-effect waves-light pink" type="submit">
+                                    <i class="material-icons">search</i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" name="view" value="{{ view_type }}">
+                <input type="hidden" name="order_by" value="{{ order_by }}">
+            </form>
+        </div>
+
+        <!-- Update Form (hidden) -->
+        <form id="update-form" action="/update" method="post" style="display: none;"></form>
+
+        <!-- Flash Messages -->
+        {% if message %}
+        <div id="toast-container">
+            <div class="toast">{{ message }}</div>
+        </div>
+        {% endif %}
+
+        <!-- View and Sort Controls -->
+        <div class="row controls-row">
+            <div class="col s12 m6">
+                <div class="input-field">
+                    <select id="sort-select" onchange="updateSort()">
+                        <option value="title_asc" {% if order_by == 'title_asc' %}selected{% endif %}>Title (A-Z)</option>
+                        <option value="title_desc" {% if order_by == 'title_desc' %}selected{% endif %}>Title (Z-A)</option>
+                        <option value="year_asc" {% if order_by == 'year_asc' %}selected{% endif %}>Year (Oldest)</option>
+                        <option value="year_desc" {% if order_by == 'year_desc' %}selected{% endif %}>Year (Newest)</option>
+                        <option value="date_asc" {% if order_by == 'date_asc' %}selected{% endif %}>File Date (Oldest)</option>
+                        <option value="date_desc" {% if order_by == 'date_desc' %}selected{% endif %}>File Date (Newest)</option>
+                        <option value="size_asc" {% if order_by == 'size_asc' %}selected{% endif %}>Size (Smallest)</option>
+                        <option value="size_desc" {% if order_by == 'size_desc' %}selected{% endif %}>Size (Largest)</option>
+                    </select>
+                    <label>Sort By</label>
+                </div>
+            </div>
+            <div class="col s12 m6 view-toggle-container">
+                <div class="switch">
+                    <label>
+                        <i class="material-icons">view_module</i>
+                        <input type="checkbox" id="view-toggle" {% if view_type == 'list' %}checked{% endif %}>
+                        <span class="lever"></span>
+                        <i class="material-icons">view_list</i>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Movie Display -->
+        {% if view_type == 'card' %}
+            <!-- Card View -->
+            <div class="row">
+                {% for movie in movies %}
+                <div class="col s12 m6 l4">
+                    <div class="card movie-card hoverable">
+                        <div class="card-content">
+                            <span class="card-title movie-title truncate">{{ movie[2] }}</span>
+                            <div class="movie-meta">
+                                <div><i class="material-icons tiny">date_range</i> Year: {{ movie[3] if movie[3] else 'N/A' }}</div>
+                                <div><i class="material-icons tiny">high_quality</i> Resolution: {{ movie[4] if movie[4] else 'N/A' }}</div>
+                                <div><i class="material-icons tiny">code</i> Codec: {{ movie[5] if movie[5] else 'N/A' }}</div>
+                                <div><i class="material-icons tiny">storage</i> Size: {{ "%.2f"|format(movie[7] / (1024*1024)) }} MB</div>
+                            </div>
+                        </div>
+                        <div class="card-action pink lighten-4">
+                            <span class="truncate grey-text text-darken-2">
+                                <i class="material-icons tiny">folder</i> {{ movie[1] }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <!-- List View -->
+            <div class="row">
+                <div class="col s12">
+                    <table class="highlight responsive-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Year</th>
+                                <th>Resolution</th>
+                                <th>Codec</th>
+                                <th>Size</th>
+                                <th>Filename</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for movie in movies %}
+                            <tr>
+                                <td>{{ movie[2] }}</td>
+                                <td>{{ movie[3] if movie[3] else 'N/A' }}</td>
+                                <td>{{ movie[4] if movie[4] else 'N/A' }}</td>
+                                <td>{{ movie[5] if movie[5] else 'N/A' }}</td>
+                                <td>{{ "%.2f"|format(movie[7] / (1024*1024)) }} MB</td>
+                                <td class="truncate">{{ movie[1] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Pagination -->
+        <div class="row">
+            <div class="col s12 center-align">
+                <ul class="pagination">
+                    {% if page > 1 %}
+                        <li class="waves-effect"><a href="{{ url_for('index', page=page-1, search=search_query, view=view_type, order_by=order_by) }}"><i class="material-icons">chevron_left</i></a></li>
+                    {% else %}
+                        <li class="disabled"><a href="#!"><i class="material-icons">chevron_left</i></a></li>
+                    {% endif %}
+                    
+                    {% for p in range(1, total_pages+1) %}
+                        {% if p == page %}
+                            <li class="active pink"><a href="#!">{{ p }}</a></li>
+                        {% else %}
+                            <li class="waves-effect"><a href="{{ url_for('index', page=p, search=search_query, view=view_type, order_by=order_by) }}">{{ p }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page < total_pages %}
+                        <li class="waves-effect"><a href="{{ url_for('index', page=page+1, search=search_query, view=view_type, order_by=order_by) }}"><i class="material-icons">chevron_right</i></a></li>
+                    {% else %}
+                        <li class="disabled"><a href="#!"><i class="material-icons">chevron_right</i></a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <footer class="page-footer pink lighten-1">
+        <div class="container">
+            <div class="row">
+                <div class="col s12">
+                    <p class="white-text">Movie Database &copy; {{ now.year }}</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+        // Initialize toast message
+        {% if message %}
+        document.addEventListener('DOMContentLoaded', function() {
+            M.toast({html: '{{ message }}', classes: 'rounded'});
+        });
+        {% endif %}
+
+        // Initialize materialize components
+        document.addEventListener('DOMContentLoaded', function() {
+            // View toggle functionality
+            const viewToggle = document.getElementById('view-toggle');
+            viewToggle.addEventListener('change', function() {
+                const viewType = this.checked ? 'list' : 'card';
+                updateUrlParam('view', viewType);
+            });
+            
+            // Initialize select dropdown
+            M.FormSelect.init(document.querySelectorAll('select'));
+            
+            // Initialize export dropdown
+            const dropdowns = document.querySelectorAll('.dropdown-trigger');
+            M.Dropdown.init(dropdowns, {
+                coverTrigger: false,
+                constrainWidth: false
+            });
+        });
+
+        // Update sort order
+        function updateSort() {
+            const sortSelect = document.getElementById('sort-select');
+            updateUrlParam('order_by', sortSelect.value);
+        }
+
+        // Helper function to update URL parameter
+        function updateUrlParam(param, value) {
+            const url = new URL(window.location.href);
+            url.searchParams.set(param, value);
+            // Reset to first page when changing view or sort
+            url.searchParams.set('page', 1);
+            window.location.href = url.toString();
+        }
+    </script>
+</body>
+</html>
