@@ -328,7 +328,7 @@ function MainApp() {
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Database Film
+            MovieDB
           </Typography>
           <ToggleButtonGroup
             value={view}
