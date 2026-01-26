@@ -1,0 +1,14 @@
+[Unit]
+Description=Movie DB Backend e Frontend
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/data/Projects/PlatformIO/movie-db
+ExecStart=/bin/bash /data/Projects/PlatformIO/movie-db/manage-movie-db.sh start
+ExecStop=/bin/bash /data/Projects/PlatformIO/movie-db/manage-movie-db.sh stop
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
