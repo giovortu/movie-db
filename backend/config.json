@@ -1,5 +1,6 @@
 {
   "movieDirs": [
-    "/home/giovortu/Documents/Projects/movie-db/backend/mnt/Movies/"
+    "/mnt/Movies/",
+    "/mnt2/Movies/"
   ]
 }

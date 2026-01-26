@@ -28,13 +28,18 @@ function getImageUrl(path) {
 }
 
 function MovieCard({ movie, onDetails, onPoster }) {
-  const coverUrl = movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg';
+  // Usa il poster se presente, altrimenti la cover (fanart), altrimenti il placeholder
+  const previewUrl = movie.poster ? getImageUrl(movie.poster)
+    : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
+  // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
+  const isSerie = !!movie.showtitle && (!movie.season && !movie.episode);
+  const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
   return (
     <Card sx={{ width: 260, minWidth: 260, maxWidth: 260, minHeight: 420, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <CardMedia component="img" height="200" image={coverUrl} alt={movie.title} sx={{ objectFit: 'cover' }} />
+      <CardMedia component="img" height="200" image={previewUrl} alt={movie.title} sx={{ objectFit: 'cover' }} />
       <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <Typography gutterBottom variant="h6" component="div">
-          {movie.title || movie.originaltitle}
+          {displayTitle}
         </Typography>
         {movie.year && (
           <Typography variant="subtitle2" color="text.secondary">
@@ -76,17 +81,23 @@ function MovieCard({ movie, onDetails, onPoster }) {
 }
 
 function MovieListItem({ movie, onDetails, onPoster }) {
+  // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
+  const isSerie = !!movie.showtitle && (!movie.season && !movie.episode);
+  const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
+  // Usa il poster se presente, altrimenti la cover (fanart), altrimenti il placeholder
+  const previewUrl = movie.poster ? getImageUrl(movie.poster)
+    : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
   return (
     <ListItem alignItems="center" sx={{ display: 'flex', alignItems: 'stretch', py: 1, width: 700, maxWidth: '100%' }} disableGutters>
       <Box sx={{ flex: '0 0 64px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {movie.cover ? (
-          <Avatar variant="square" src={getImageUrl(movie.cover)} alt={movie.title} sx={{ width: 56, height: 56 }} />
+        {previewUrl ? (
+          <Avatar variant="square" src={previewUrl} alt={movie.title} sx={{ width: 56, height: 56 }} />
         ) : (
           <Avatar variant="square" sx={{ width: 56, height: 56 }}>{movie.title?.[0] || '?'}</Avatar>
         )}
       </Box>
       <Box sx={{ flex: '1 1 0', px: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0 }}>
-        <Typography variant="subtitle1" noWrap>{movie.title || movie.originaltitle}</Typography>
+        <Typography variant="subtitle1" noWrap>{displayTitle}</Typography>
         {movie.year && (
           <Typography variant="caption" color="text.secondary" noWrap>Anno: {movie.year}</Typography>
         )}
@@ -121,6 +132,8 @@ function MovieListItem({ movie, onDetails, onPoster }) {
 
 
 function MainApp() {
+    // Dialog di caricamento per refresh
+    const [loadingDialog, setLoadingDialog] = useState(false);
   const [movies, setMovies] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -137,26 +150,39 @@ function MainApp() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    setLoadingDialog(true);
     try {
       const res = await axios.post(`${process.env.REACT_APP_API}/api/refresh`);
       if (res.status !== 200) {
         setRefreshError(true);
         console.error('Errore API refresh:', res);
       } else {
-        fetchMovies(page);
+        await fetchMovies(page);
       }
     } catch (e) {
       setRefreshError(true);
       console.error('Errore chiamata refresh:', e);
     }
     setRefreshing(false);
+    setLoadingDialog(false);
   };
+  // Dialog di caricamento per refresh database
+  // (deve essere nel return, non dentro handleRefresh)
+      <Dialog open={loadingDialog} PaperProps={{ sx: { p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' } }}>
+        <CircularProgress sx={{ mb: 2 }} />
+        <Typography variant="h6">Scansione in corso...</Typography>
+        <Typography variant="body2" color="text.secondary">La scansione del database potrebbe richiedere alcuni minuti.</Typography>
+      </Dialog>
 
   const handleOpenSetup = async () => {
+    const apiUrl = `${process.env.REACT_APP_API || 'http://localhost:3001'}/api/setup`;
+    console.log('handleOpenSetup chiamato, url:', apiUrl);
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API}/api/setup`);
+      const res = await axios.get(apiUrl);
+      console.log('API /api/setup response:', res.data);
       setSetupInitial(res.data.movieDirs || []);
     } catch (e) {
+      alert('Errore chiamata API /api/setup: ' + (e?.message || e));
       setSetupInitial([]);
     }
     setOpenSetup(true);
@@ -221,6 +247,11 @@ function MainApp() {
           </IconButton>
         </Toolbar>
       </AppBar>
+      <Dialog open={loadingDialog} PaperProps={{ sx: { p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' } }}>
+        <CircularProgress sx={{ mb: 2 }} />
+        <Typography variant="h6">Scansione in corso...</Typography>
+        <Typography variant="body2" color="text.secondary">La scansione del database potrebbe richiedere alcuni minuti.</Typography>
+      </Dialog>
       <Dialog open={openSetup} onClose={() => setOpenSetup(false)} maxWidth="sm" fullWidth>
         <Setup initialPaths={setupInitial} onClose={() => setOpenSetup(false)} />
       </Dialog>
@@ -235,7 +266,7 @@ function MainApp() {
             )}
             <Box mb={2}>
               <img
-                src={detailsMovie.cover ? getImageUrl(detailsMovie.cover) : process.env.PUBLIC_URL + '/no-image.svg'}
+                src={detailsMovie.poster ? getImageUrl(detailsMovie.poster) : process.env.PUBLIC_URL + '/no-image.svg'}
                 alt={detailsMovie.title}
                 style={{ width: '100%', maxHeight: 300, objectFit: 'contain', marginBottom: 16 }}
               />

@@ -46,6 +46,9 @@ export default function Setup({ initialPaths = [], onClose }) {
     <Container maxWidth="sm" sx={{ mt: 6 }}>
       <Paper sx={{ p: 4 }}>
         <Typography variant="h5" gutterBottom>Setup cartelle film</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Puoi aggiungere più cartelle: l’ordine determina la priorità di scansione e delle immagini. Le immagini saranno servite da <b>/img/0</b>, <b>/img/1</b>, ecc.
+        </Typography>
         <form onSubmit={handleSubmit}>
           <List>
             {paths.map((path, idx) => (
@@ -55,7 +58,7 @@ export default function Setup({ initialPaths = [], onClose }) {
                 </IconButton>
               }>
                 <TextField
-                  label={`Percorso cartella #${idx + 1}`}
+                  label={`Cartella #${idx + 1}`}
                   value={path}
                   onChange={e => handlePathChange(idx, e.target.value)}
                   fullWidth
