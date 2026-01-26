@@ -174,6 +174,7 @@ function MainApp() {
   const [openSetup, setOpenSetup] = useState(false);
   const [setupInitial, setSetupInitial] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [confirmRefresh, setConfirmRefresh] = useState(false);
   const [refreshError, setRefreshError] = useState(false);
   const [detailsMovie, setDetailsMovie] = useState(null);
   const [posterDialog, setPosterDialog] = useState({ open: false, url: '', title: '' });
@@ -250,6 +251,7 @@ function MainApp() {
     }
     setRefreshing(false);
     setLoadingDialog(false);
+    setConfirmRefresh(false);
   };
   // Dialog di caricamento per refresh database
   // (deve essere nel return, non dentro handleRefresh)
@@ -350,7 +352,17 @@ function MainApp() {
               <option key={opt} value={opt}>{opt} / pagina</option>
             ))}
           </select>
-          <IconButton color="inherit" onClick={handleRefresh} title="Aggiorna database" disabled={refreshing}>
+          <IconButton color="inherit" onClick={() => setConfirmRefresh(true)} title="Aggiorna database" disabled={refreshing}>
+                  <Dialog open={confirmRefresh} onClose={() => setConfirmRefresh(false)}>
+                    <Box sx={{ p: 3, minWidth: 300 }}>
+                      <Typography variant="h6" sx={{ mb: 2 }}>Sei sicuro di voler riscansionare il database?</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>L'operazione potrebbe richiedere alcuni minuti e sovrascriverà i dati attuali.</Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                        <Button onClick={() => setConfirmRefresh(false)} color="secondary">Annulla</Button>
+                        <Button onClick={handleRefresh} color="primary" variant="contained" autoFocus>Conferma</Button>
+                      </Box>
+                    </Box>
+                  </Dialog>
             <RefreshIcon />
           </IconButton>
           <IconButton color="inherit" onClick={handleOpenSetup} title="Setup cartelle">
