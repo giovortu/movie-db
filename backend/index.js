@@ -654,6 +654,6 @@ app.post('/api/setup', (req, res) => {
   }
 });
 
-app.listen(3001, () => {
-  console.log('Backend avviato su http://localhost:3001');
+app.listen(4001, () => {
+  console.log('Backend avviato su http://localhost:4001');
 });
