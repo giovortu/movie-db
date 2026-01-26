@@ -56,7 +56,12 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: function(origin, callback) {
+    callback(null, true); // consenti tutte le origini
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 // Endpoint per ottenere tutti i generi disponibili
@@ -654,6 +659,6 @@ app.post('/api/setup', (req, res) => {
   }
 });
 
-app.listen(4001, () => {
-  console.log('Backend avviato su http://localhost:4001');
+app.listen(4001, '0.0.0.0', () => {
+  console.log('Backend avviato su http://0.0.0.0:4001 (accessibile da remoto)');
 });

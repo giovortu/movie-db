@@ -11,9 +11,16 @@ start() {
   echo $BACKEND_PID > "$DIR/backend.pid"
   echo "[movie-db] Avvio frontend..."
   cd "$DIR/frontend" && npm start &
-  FRONTEND_PID=$!
+  NPM_PID=$!
+  # Attendi che il vero processo React sia avviato
+  sleep 3
+  FRONTEND_PID=$(pgrep -P $NPM_PID node | head -n1)
+  if [ -z "$FRONTEND_PID" ]; then
+    # fallback: prendi il processo node più recente avviato da npm
+    FRONTEND_PID=$(ps --sort=-start_time -eo pid,ppid,cmd | grep "react-scripts start" | grep -v grep | awk '{print $1}' | head -n1)
+  fi
   echo $FRONTEND_PID > "$DIR/frontend.pid"
-  echo "[movie-db] Backend PID: $BACKEND_PID, Frontend PID: $FRONTEND_PID"
+  echo "[movie-db] Backend PID: $BACKEND_PID, Frontend PID: $FRONTEND_PID (npm: $NPM_PID)"
 }
 
 stop() {

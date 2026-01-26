@@ -23,7 +23,7 @@ function getImageUrl(path) {
   if (!path) return undefined;
   if (path.startsWith('/img')) {
     // Usa la base URL del backend (porta 4001)
-    const api = process.env.REACT_APP_API || 'http://localhost:4001';
+    const api = process.env.REACT_APP_API || 'http://192.168.0.227:4001';
     return api.replace(/\/$/, '') + path;
   }
   return path;
@@ -211,7 +211,7 @@ function MainApp() {
       const showtitle = detailsMovie.showtitle;
       const normalizedShowtitle = normalizeTitle(showtitle);
       console.log('Dettagli serie aperti, showtitle:', showtitle, 'normalizzato:', normalizedShowtitle);
-      axios.get('http://localhost:4001/api/episodes', { params: { showtitle } })
+      axios.get('http://192.168.0.227:4001/api/episodes', { params: { showtitle } })
         .then(res => {
           // Filtro anche lato frontend per sicurezza
           const episodes = (res.data.episodes || []).filter(ep => normalizeTitle(ep.showtitle) === normalizedShowtitle);
@@ -228,7 +228,7 @@ function MainApp() {
   }, [detailsMovie]);
   // Carica i generi dal backend
   useEffect(() => {
-    axios.get('http://localhost:4001/api/genres')
+    axios.get('http://192.168.0.227:4001/api/genres')
       .then(res => setGenres(res.data.genres || []))
       .catch(() => setGenres([]));
   }, []);
@@ -237,7 +237,7 @@ function MainApp() {
     setRefreshing(true);
     setLoadingDialog(true);
     try {
-      const res = await axios.post('http://localhost:4001/api/refresh');
+      const res = await axios.post('http://192.168.0.227:4001/api/refresh');
       if (res.status !== 200) {
         setRefreshError(true);
         console.error('Errore API refresh:', res);
@@ -260,7 +260,7 @@ function MainApp() {
       </Dialog>
 
   const handleOpenSetup = async () => {
-    const apiUrl = 'http://localhost:4001/api/setup';
+    const apiUrl = 'http://192.168.0.227:4001/api/setup';
     console.log('handleOpenSetup chiamato, url:', apiUrl);
     try {
       const res = await axios.get(apiUrl);
@@ -283,7 +283,7 @@ function MainApp() {
         dir,
       };
       if (genre && genre !== '') params.genre = genre;
-      const res = await axios.get('http://localhost:4001/api/movies', { params });
+      const res = await axios.get('http://192.168.0.227:4001/api/movies', { params });
       let filtered = res.data.movies;
       let total = res.data.total;
       setMovies(filtered);

@@ -1,2 +1,2 @@
 [dotenv@17.2.3] injecting env (1) from .env -- tip: 🔑 add access controls to secrets: https://dotenvx.com/ops
-Backend avviato su http://localhost:3001
+Backend avviato su http://192.168.0.227:3001
