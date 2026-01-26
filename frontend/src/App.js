@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState } from 'react';
 import {
   AppBar, Toolbar, Typography, Container, Grid, Card, CardMedia, CardContent, CardActions, Button, IconButton, List, ListItem, ListItemAvatar, ListItemText, Avatar, Pagination, ToggleButton, ToggleButtonGroup, CircularProgress, Box, Snackbar, Alert
@@ -15,7 +16,7 @@ import Setup from './Setup';
 import Dialog from '@mui/material/Dialog';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE_OPTIONS = [3, 4, 6, 8, 12, 24, 48];
 
 function getImageUrl(path) {
   console.log( path );
@@ -29,15 +30,22 @@ function getImageUrl(path) {
 }
 
 function MovieCard({ movie, onDetails, onPoster }) {
-  // Usa il poster se presente, altrimenti la cover (fanart), altrimenti il placeholder
-  const previewUrl = movie.poster ? getImageUrl(movie.poster)
-    : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
+  // Mostra il poster come immagine principale se presente, altrimenti la fanart (cover), altrimenti il placeholder
+  const previewUrl = movie.poster ? getImageUrl(movie.poster) : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
   // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
   const isSerie = !!movie.showtitle && (!movie.season && !movie.episode);
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
+
   return (
     <Card sx={{ width: 260, minWidth: 260, maxWidth: 260, minHeight: 420, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <CardMedia component="img" height="200" image={previewUrl} alt={movie.title} sx={{ objectFit: 'cover' }} />
+      <CardMedia
+        component="img"
+        height="200"
+        image={previewUrl}
+        alt={movie.title}
+        sx={{ objectFit: 'cover', cursor: movie.poster ? 'pointer' : 'default' }}
+        onClick={movie.poster ? () => onPoster(movie.poster, movie.title) : undefined}
+      />
       <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <Typography gutterBottom variant="h6" component="div">
           {displayTitle}
@@ -52,10 +60,15 @@ function MovieCard({ movie, onDetails, onPoster }) {
             Titolo originale: {movie.originaltitle}
           </Typography>
         )}
+        {movie.genres && movie.genres.length > 0 && (
+          <Typography variant="caption" color="primary" sx={{ mb: 1, mt: 1 }}>
+            {movie.genres}
+          </Typography>
+        )}
         <Typography
           variant="body2"
           color="text.secondary"
-          sx={{ mt: 1, flexGrow: 1, display: '-webkit-box', WebkitLineClamp: 5, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}
+          sx={{ mt: 1, flexGrow: 1, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis', minHeight: 40 }}
         >
           {movie.plot}
         </Typography>
@@ -64,9 +77,9 @@ function MovieCard({ movie, onDetails, onPoster }) {
         <Button
           size="small"
           variant="outlined"
-          onClick={() => onPoster(movie.poster, movie.title)}
-          title="Poster"
-          disabled={!movie.poster}
+          onClick={() => onPoster(movie.cover, movie.title)}
+          title="Fanart"
+          disabled={!movie.cover}
         >
           <ImageIcon />
         </Button>
@@ -85,14 +98,19 @@ function MovieListItem({ movie, onDetails, onPoster }) {
   // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
   const isSerie = !!movie.showtitle && (!movie.season && !movie.episode);
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
-  // Usa il poster se presente, altrimenti la cover (fanart), altrimenti il placeholder
-  const previewUrl = movie.poster ? getImageUrl(movie.poster)
-    : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
+  // Mostra il poster come immagine principale se presente, altrimenti la fanart (cover), altrimenti il placeholder
+  const previewUrl = movie.poster ? getImageUrl(movie.poster) : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
   return (
     <ListItem alignItems="center" sx={{ display: 'flex', alignItems: 'stretch', py: 1, width: 700, maxWidth: '100%' }} disableGutters>
       <Box sx={{ flex: '0 0 64px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {previewUrl ? (
-          <Avatar variant="square" src={previewUrl} alt={movie.title} sx={{ width: 56, height: 56 }} />
+          <Avatar
+            variant="square"
+            src={previewUrl}
+            alt={movie.title}
+            sx={{ width: 56, height: 56, cursor: movie.poster ? 'pointer' : 'default' }}
+            onClick={movie.poster ? () => onPoster(movie.poster, movie.title) : undefined}
+          />
         ) : (
           <Avatar variant="square" sx={{ width: 56, height: 56 }}>{movie.title?.[0] || '?'}</Avatar>
         )}
@@ -105,6 +123,11 @@ function MovieListItem({ movie, onDetails, onPoster }) {
         {movie.originaltitle && movie.originaltitle !== movie.title && (
           <Typography variant="caption" color="text.secondary" noWrap>Titolo originale: {movie.originaltitle}</Typography>
         )}
+        {movie.genres && movie.genres.length > 0 && (
+          <Typography variant="caption" color="primary" noWrap sx={{ mb: 0.5, mt: 0.5 }}>
+            {movie.genres}
+          </Typography>
+        )}
         <Typography variant="body2" color="text.secondary" noWrap sx={{ mt: 0.5 }}>
           {movie.plot}
         </Typography>
@@ -113,9 +136,9 @@ function MovieListItem({ movie, onDetails, onPoster }) {
         <Button
           size="small"
           variant="outlined"
-          onClick={() => onPoster(movie.poster, movie.title)}
-          title="Poster"
-          disabled={!movie.poster}
+          onClick={() => onPoster(movie.cover, movie.title)}
+          title="Fanart"
+          disabled={!movie.cover}
         >
           <ImageIcon />
         </Button>
@@ -156,12 +179,65 @@ function MainApp() {
   const [posterDialog, setPosterDialog] = useState({ open: false, url: '', title: '' });
   const [sortField, setSortField] = useState(getInitialSortField());
   const [sortDir, setSortDir] = useState(getInitialSortDir());
+  const [genres, setGenres] = useState([]);
+  const getInitialGenre = () => localStorage.getItem('movie-db-genre') || '';
+  const [selectedGenre, setSelectedGenre] = useState(getInitialGenre());
+  const getInitialPageSize = () => parseInt(localStorage.getItem('movie-db-pageSize'), 10) || 12;
+  const [pageSize, setPageSize] = useState(getInitialPageSize());
+  const [episodes, setEpisodes] = useState([]);
+  const [playerDialog, setPlayerDialog] = useState({ open: false, url: '', title: '' });
+
+  // Utility per ottenere url assoluto per il player
+  function getPlayerUrl(url) {
+    if (!url) return '';
+    // Decodifica se url encoded
+    let decoded = decodeURIComponent(url);
+    if (/^https?:\/\//i.test(decoded) || /^file:\/\//i.test(decoded)) return decoded;
+    return 'file://' + decoded;
+  }
+
+  // Funzione di normalizzazione coerente con il backend
+  function normalizeTitle(str) {
+    return (str || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9àèéìòù'\s]/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Carica gli episodi quando si apre il dialog dettagli di una serie
+  useEffect(() => {
+    if (detailsMovie && detailsMovie.showtitle && !detailsMovie.season && !detailsMovie.episode) {
+      const showtitle = detailsMovie.showtitle;
+      const normalizedShowtitle = normalizeTitle(showtitle);
+      console.log('Dettagli serie aperti, showtitle:', showtitle, 'normalizzato:', normalizedShowtitle);
+      axios.get('http://localhost:3001/api/episodes', { params: { showtitle } })
+        .then(res => {
+          // Filtro anche lato frontend per sicurezza
+          const episodes = (res.data.episodes || []).filter(ep => normalizeTitle(ep.showtitle) === normalizedShowtitle);
+          console.log('Episodi trovati:', episodes);
+          setEpisodes(episodes);
+        })
+        .catch(err => {
+          setEpisodes([]);
+          console.error('Errore caricamento episodi:', err);
+        });
+    } else {
+      setEpisodes([]);
+    }
+  }, [detailsMovie]);
+  // Carica i generi dal backend
+  useEffect(() => {
+    axios.get('http://localhost:3001/api/genres')
+      .then(res => setGenres(res.data.genres || []))
+      .catch(() => setGenres([]));
+  }, []);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     setLoadingDialog(true);
     try {
-      const res = await axios.post(`${process.env.REACT_APP_API}/api/refresh`);
+      const res = await axios.post('http://localhost:3001/api/refresh');
       if (res.status !== 200) {
         setRefreshError(true);
         console.error('Errore API refresh:', res);
@@ -184,7 +260,7 @@ function MainApp() {
       </Dialog>
 
   const handleOpenSetup = async () => {
-    const apiUrl = `${process.env.REACT_APP_API || 'http://localhost:3001'}/api/setup`;
+    const apiUrl = 'http://localhost:3001/api/setup';
     console.log('handleOpenSetup chiamato, url:', apiUrl);
     try {
       const res = await axios.get(apiUrl);
@@ -197,19 +273,21 @@ function MainApp() {
     setOpenSetup(true);
   };
 
-  const fetchMovies = async (page, sort = sortField, dir = sortDir) => {
+  const fetchMovies = async (page, sort = sortField, dir = sortDir, genre = selectedGenre, pageSizeParam = pageSize) => {
     setLoading(true);
     try {
-      const res = await axios.get(`${process.env.REACT_APP_API}/api/movies`, {
-        params: {
-          page,
-          pageSize: PAGE_SIZE,
-          sort,
-          dir,
-        },
-      });
-      setMovies(res.data.movies);
-      setTotal(res.data.total);
+      const params = {
+        page,
+        pageSize: pageSizeParam,
+        sort,
+        dir,
+      };
+      if (genre && genre !== '') params.genre = genre;
+      const res = await axios.get('http://localhost:3001/api/movies', { params });
+      let filtered = res.data.movies;
+      let total = res.data.total;
+      setMovies(filtered);
+      setTotal(total);
     } catch (e) {
       setMovies([]);
       setTotal(0);
@@ -230,9 +308,16 @@ function MainApp() {
   }, [sortDir]);
 
   useEffect(() => {
-    fetchMovies(page, sortField, sortDir);
+    fetchMovies(page, sortField, sortDir, selectedGenre, pageSize);
     // eslint-disable-next-line
-  }, [page, sortField, sortDir]);
+  }, [page, sortField, sortDir, selectedGenre, pageSize]);
+  useEffect(() => {
+    localStorage.setItem('movie-db-pageSize', pageSize);
+  }, [pageSize]);
+
+  useEffect(() => {
+    localStorage.setItem('movie-db-genre', selectedGenre);
+  }, [selectedGenre]);
 
   const handleView = (event, nextView) => {
     if (nextView !== null) setView(nextView);
@@ -260,6 +345,11 @@ function MainApp() {
               <ViewModuleIcon sx={{ color: 'white' }} />
             </ToggleButton>
           </ToggleButtonGroup>
+          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} style={{ fontSize: '1rem', padding: '4px 8px', borderRadius: 4, marginRight: 16 }} data-testid="page-size-select">
+            {PAGE_SIZE_OPTIONS.map(opt => (
+              <option key={opt} value={opt}>{opt} / pagina</option>
+            ))}
+          </select>
           <IconButton color="inherit" onClick={handleRefresh} title="Aggiorna database" disabled={refreshing}>
             <RefreshIcon />
           </IconButton>
@@ -276,13 +366,18 @@ function MainApp() {
       <Dialog open={openSetup} onClose={() => setOpenSetup(false)} maxWidth="sm" fullWidth>
         <Setup initialPaths={setupInitial} onClose={() => setOpenSetup(false)} />
       </Dialog>
-      <Dialog open={!!detailsMovie} onClose={() => setDetailsMovie(null)} maxWidth="sm" fullWidth>
+      <Dialog open={!!detailsMovie} onClose={() => { setDetailsMovie(null); setEpisodes([]); }} maxWidth="sm" fullWidth>
         {detailsMovie && (
           <Box p={3}>
             <Typography variant="h5" gutterBottom>{detailsMovie.title || detailsMovie.originaltitle}</Typography>
             {detailsMovie.originaltitle && detailsMovie.originaltitle !== detailsMovie.title && (
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 Titolo originale: {detailsMovie.originaltitle}
+              </Typography>
+            )}
+            {detailsMovie.genres && detailsMovie.genres.length > 0 && (
+              <Typography variant="caption" color="primary" gutterBottom>
+                {detailsMovie.genres}
               </Typography>
             )}
             <Box mb={2}>
@@ -297,6 +392,65 @@ function MainApp() {
               <Button size="small" variant="outlined" onClick={() => setPosterDialog({ open: true, url: getImageUrl(detailsMovie.poster), title: detailsMovie.title })} sx={{ mr: 1 }}>Poster</Button>
             )}
             <Button size="small" variant="outlined" href={detailsMovie.video} target="_blank">Apri Video</Button>
+            {/* Lista episodi per le serie */}
+            {detailsMovie.showtitle && !detailsMovie.season && !detailsMovie.episode && (
+              <Box mt={3}>
+                <Typography variant="h6" gutterBottom>Episodi</Typography>
+                {episodes.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">Nessun episodio trovato.</Typography>
+                ) : (
+                  <List dense>
+                    {episodes.map(ep => {
+                      if (ep.video) {
+                        const url = getPlayerUrl(ep.video);
+                        if (/^https?:\/\//i.test(url)) {
+                          return (
+                            <ListItem
+                              key={ep.id}
+                              sx={{ pl: 0 }}
+                              button
+                              onClick={() => window.open(url, '_blank', 'noopener')}
+                            >
+                              <ListItemText
+                                primary={`Stagione ${ep.season || '?'} Ep. ${ep.episode || '?'}: ${ep.title || ''}`}
+                                secondary={ep.aired ? `Data: ${ep.aired}` : ''}
+                              />
+                            </ListItem>
+                          );
+                        } else {
+                          // file:// o altro: uso <a> nativo
+                          return (
+                            <ListItem
+                              key={ep.id}
+                              sx={{ pl: 0 }}
+                              component="a"
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ListItemText
+                                primary={`Stagione ${ep.season || '?'} Ep. ${ep.episode || '?'}: ${ep.title || ''}`}
+                                secondary={ep.aired ? `Data: ${ep.aired}` : ''}
+                              />
+                            </ListItem>
+                          );
+                        }
+                      } else {
+                        return (
+                          <ListItem key={ep.id} sx={{ pl: 0 }}>
+                            <ListItemText
+                              primary={`Stagione ${ep.season || '?'} Ep. ${ep.episode || '?'}: ${ep.title || ''}`}
+                              secondary={ep.aired ? `Data: ${ep.aired}` : ''}
+                            />
+                          </ListItem>
+                        );
+                      }
+                    })}
+                        {/* Player Dialog rimosso: ora i video si aprono in una nuova finestra */}
+                  </List>
+                )}
+              </Box>
+            )}
           </Box>
         )}
       </Dialog>
@@ -322,9 +476,15 @@ function MainApp() {
               <option value="asc">Crescente</option>
               <option value="desc">Decrescente</option>
             </select>
+            <select value={selectedGenre} onChange={e => { setSelectedGenre(e.target.value); setPage(1); }} style={{ fontSize: '1rem', padding: '4px 8px', borderRadius: 4, minWidth: 120 }} data-testid="genre-select">
+              <option value="">Tutti i generi</option>
+              {genres.map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
           </Box>
           <Pagination
-            count={Math.ceil(total / PAGE_SIZE)}
+            count={Math.ceil(total / pageSize)}
             page={page}
             onChange={(_, value) => setPage(value)}
             color="primary"
@@ -355,7 +515,7 @@ function MainApp() {
         )}
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
           <Pagination
-            count={Math.ceil(total / PAGE_SIZE)}
+            count={Math.ceil(total / pageSize)}
             page={page}
             onChange={(_, value) => setPage(value)}
             color="primary"

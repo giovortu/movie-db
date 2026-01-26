@@ -29,7 +29,8 @@ db.serialize(() => {
     aired TEXT,
     rating TEXT,
     imdbid TEXT,
-    tmdbid TEXT
+    tmdbid TEXT,
+    genres TEXT -- lista generi separati da virgola
   )`);
   db.run(`CREATE TABLE IF NOT EXISTS episodes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +44,10 @@ db.serialize(() => {
     nfo TEXT,
     path TEXT
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS genres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE
+  )`);
 });
 
 // Configurazione: cartelle film da file config.json o .env
@@ -53,6 +58,15 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Endpoint per ottenere tutti i generi disponibili
+app.get('/api/genres', (req, res) => {
+  db.all('SELECT name FROM genres ORDER BY name COLLATE NOCASE', (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Errore DB' });
+    res.json({ genres: rows.map(r => r.name) });
+  });
+});
+
 
 // Endpoint per ottenere gli episodi
 app.get('/api/episodes', (req, res) => {
@@ -137,18 +151,142 @@ if (MOVIE_DIRS.length > 0) {
 
 
 function getMovieInfoFromNfo(nfoPath) {
+  // Dizionario di traduzione generi EN->IT
+  const genreMap = {
+    'Action': 'Azione',
+    'Adventure': 'Avventura',
+    'Animation': 'Animazione',
+    'Biography': 'Biografico',
+    'Comedy': 'Commedia',
+    'Crime': 'Crime',
+    'Documentary': 'Documentario',
+    'Drama': 'Drammatico',
+    'Family': 'Famiglia',
+    'Fantasy': 'Fantasy',
+    'History': 'Storico',
+    'Horror': 'Horror',
+    'Music': 'Musicale',
+    'Musical': 'Musical',
+    'Mystery': 'Mistero',
+    'Romance': 'Romantico',
+    'Sci-Fi': 'Fantascienza',
+    'Science Fiction': 'Fantascienza',
+    'Sport': 'Sportivo',
+    'Thriller': 'Thriller',
+    'War': 'Guerra',
+    'Western': 'Western',
+    'Talk-Show': 'Talk Show',
+    'Game-Show': 'Game Show',
+    'Reality-TV': 'Reality',
+    'News': 'Notizie',
+    'Short': 'Corto',
+    'Film-Noir': 'Noir',
+    'Adult': 'Adulto',
+    'Animation': 'Animazione',
+    'Children': 'Bambini',
+    'Erotic': 'Erotico',
+    'Experimental': 'Sperimentale',
+    'Superhero': 'Supereroi',
+    'Crime': 'Crimine',
+    'Documentary': 'Documentario',
+    'Biography': 'Biografico',
+    'History': 'Storico',
+    'Music': 'Musicale',
+    'Musical': 'Musical',
+    'News': 'Notizie',
+    'Reality-TV': 'Reality',
+    'Short': 'Corto',
+    'Talk-Show': 'Talk Show',
+    'Game-Show': 'Game Show',
+    'Western': 'Western',
+    'War': 'Guerra',
+    'Romance': 'Romantico',
+    'Mystery': 'Mistero',
+    'Fantasy': 'Fantasy',
+    'Family': 'Famiglia',
+    'Drama': 'Drammatico',
+    'Crime': 'Crimine',
+    'Comedy': 'Commedia',
+    'Adventure': 'Avventura',
+    'Action': 'Azione',
+    'Horror': 'Horror',
+    'Thriller': 'Thriller',
+    'Sci-Fi': 'Fantascienza',
+    'Sport': 'Sportivo',
+    'Animation': 'Animazione',
+    'Documentary': 'Documentario',
+    'Biography': 'Biografico',
+    'History': 'Storico',
+    'Music': 'Musicale',
+    'Musical': 'Musical',
+    'News': 'Notizie',
+    'Reality-TV': 'Reality',
+    'Short': 'Corto',
+    'Talk-Show': 'Talk Show',
+    'Game-Show': 'Game Show',
+    'Western': 'Western',
+    'War': 'Guerra',
+    'Romance': 'Romantico',
+    'Mystery': 'Mistero',
+    'Fantasy': 'Fantasy',
+    'Family': 'Famiglia',
+    'Drama': 'Drammatico',
+    'Crime': 'Crimine',
+    'Comedy': 'Commedia',
+    'Adventure': 'Avventura',
+    'Action': 'Azione',
+    'Horror': 'Horror',
+    'Thriller': 'Thriller',
+    'Sci-Fi': 'Fantascienza',
+    'Sport': 'Sportivo',
+    'Animation': 'Animazione',
+    'Documentary': 'Documentario',
+    'Biography': 'Biografico',
+    'History': 'Storico',
+    'Music': 'Musicale',
+    'Musical': 'Musical',
+    'News': 'Notizie',
+    'Reality-TV': 'Reality',
+    'Short': 'Corto',
+    'Talk-Show': 'Talk Show',
+    'Game-Show': 'Game Show',
+    'Western': 'Western',
+    'War': 'Guerra',
+    'Romance': 'Romantico',
+    'Mystery': 'Mistero',
+    'Fantasy': 'Fantasy',
+    'Family': 'Famiglia',
+    'Drama': 'Drammatico',
+    'Crime': 'Crimine',
+    'Comedy': 'Commedia',
+    'Adventure': 'Avventura',
+    'Action': 'Azione',
+    'Horror': 'Horror',
+    'Thriller': 'Thriller',
+    'Sci-Fi': 'Fantascienza',
+    'Sport': 'Sportivo',
+  };
   return new Promise((resolve, reject) => {
     fs.readFile(nfoPath, 'utf8', (err, data) => {
       if (err) return reject(err);
-      // Rimuove tutto ciò che precede il primo '<'
       const cleanData = data.slice(data.indexOf('<'));
       xml2js.parseString(cleanData, (err, result) => {
         if (err || !result ) {
           console.error(`[NFO] Errore parsing o struttura non valida in: ${nfoPath}`);
-          return resolve({ title: '', originaltitle: '', plot: '', cover: null, poster: null });
+          return resolve({ title: '', originaltitle: '', plot: '', cover: null, poster: null, genres: [] });
         }
-        // Supporta sia <movie> che <episodedetails>
         const node = result.movie || result.episodedetails || {};
+        // Estrai generi (può essere array o stringa)
+        let genres = [];
+        if (node.genre) {
+          if (Array.isArray(node.genre)) {
+            genres = node.genre.map(g => typeof g === 'string' ? g : (g._ || g)).flat();
+          } else if (typeof node.genre === 'string') {
+            genres = [node.genre];
+          }
+        }
+        // Traduci in italiano e rimuovi duplicati
+        genres = genres.map(g => (genreMap[g.trim()] || g.trim())).filter((g, i, arr) => g && arr.indexOf(g) === i);
         resolve({
           title: node.title ? node.title[0] : '',
           originaltitle: node.originaltitle ? node.originaltitle[0] : '',
@@ -162,7 +300,8 @@ function getMovieInfoFromNfo(nfoPath) {
           imdbid: node.imdbid ? node.imdbid[0] : '',
           tmdbid: node.tmdbid ? node.tmdbid[0] : '',
           cover: null, // da calcolare dopo
-          poster: null // da calcolare dopo
+          poster: null, // da calcolare dopo
+          genres
         });
       });
     });
@@ -214,10 +353,16 @@ async function refreshDatabase() {
       allMovies = allMovies.concat(scanDirRecursive(dir));
     }
     console.log(`[DEBUG] Totale file video trovati da scanDirRecursive: ${allMovies.length}`);
+    // Raccolta generi unici
+    const uniqueGenres = new Set();
     // Raggruppa per showtitle se presente, altrimenti inserisce come film singolo
     for (const m of allMovies) {
       try {
         const info = await getMovieInfoFromNfo(m.nfo);
+        // Aggiungi generi trovati a uniqueGenres
+        if (info.genres && Array.isArray(info.genres)) {
+          info.genres.forEach(g => uniqueGenres.add(g));
+        }
         if (info.showtitle && !info.title && m.video) {
           info.title = path.basename(m.video, path.extname(m.video));
         }
@@ -279,6 +424,12 @@ async function refreshDatabase() {
         console.error(`[DB] Errore parsing/inserimento per ${m.nfo}:`, e);
       }
     }
+    // Popola la tabella genres
+    for (const genre of uniqueGenres) {
+      if (genre && genre.trim()) {
+        db.run('INSERT OR IGNORE INTO genres (name) VALUES (?)', [genre.trim()]);
+      }
+    }
     console.log(`[DB] Film singoli trovati: ${singles.length}`);
     console.log(`[DB] Serie trovate: ${Object.keys(seriesMap).length}`);
     console.log(`[DB] Elementi saltati (vuoti): ${countSkipped}`);
@@ -299,15 +450,29 @@ async function refreshDatabase() {
         console.log(`[DB] Serie duplicata saltata: ${serie.showtitle} (${serie.year})`);
         continue;
       }
+      // Ricava i generi da uno degli episodi (primo disponibile con generi)
+      let serieGenres = '';
+      for (const ep of serie.episodes) {
+        if (ep.nfo) {
+          try {
+            const epInfo = await getMovieInfoFromNfo(ep.nfo);
+            if (epInfo.genres && epInfo.genres.length > 0) {
+              serieGenres = epInfo.genres.join(', ');
+              break;
+            }
+          } catch {}
+        }
+      }
       db.run(
-        `INSERT INTO movies (title, plot, year, showtitle, cover, poster) VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO movies (title, plot, year, showtitle, cover, poster, genres) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           serie.showtitle,
           serie.plot || '',
           serie.year,
           serie.showtitle,
           serie.cover,
-          serie.poster
+          serie.poster,
+          serieGenres
         ],
         function (err) {
           if (err) {
@@ -391,7 +556,7 @@ async function refreshDatabase() {
         relPoster = `/img/${dirPrefix}/${rel}`;
       }
       db.run(
-        `INSERT INTO movies (video, nfo, base, dir, title, originaltitle, plot, year, showtitle, season, episode, aired, rating, imdbid, tmdbid, cover, poster) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO movies (video, nfo, base, dir, title, originaltitle, plot, year, showtitle, season, episode, aired, rating, imdbid, tmdbid, cover, poster, genres) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           m.video,
           m.nfo,
@@ -409,7 +574,8 @@ async function refreshDatabase() {
           info.imdbid,
           info.tmdbid,
           relCover,
-          relPoster
+          relPoster,
+          info.genres && info.genres.length > 0 ? info.genres.join(', ') : ''
         ],
         function (err) {
           if (err) {
@@ -432,23 +598,30 @@ app.get('/api/movies', (req, res) => {
   let dir = req.query.dir === 'desc' ? 'DESC' : 'ASC';
   const allowedSort = { title: 'title', year: 'year' };
   let sortCol = allowedSort[sort] || 'title';
-  db.all(
-    `SELECT * FROM movies ORDER BY ${sortCol} COLLATE NOCASE ${dir} LIMIT ? OFFSET ?`,
-    [pageSize, (page - 1) * pageSize],
-    (err, rows) => {
-      if (err) return res.status(500).json({ error: 'Errore DB' });
-      db.get('SELECT COUNT(*) as count FROM movies', (err2, countRow) => {
-        if (err2) return res.status(500).json({ error: 'Errore DB' });
-        // Per ora restituisci solo i dati del database, senza arricchimento episodi
-        res.json({
-          movies: rows,
-          total: countRow.count,
-          page,
-          pageSize
-        });
+  const genre = req.query.genre;
+  let where = '';
+  let params = [];
+  if (genre && genre.trim() !== '') {
+    // Filtro esatto: trova il genere come parola intera nella lista separata da virgole, case-insensitive
+    where = `WHERE (',' || lower(genres) || ',') LIKE ?`;
+    params.push(`%,${genre.trim().toLowerCase()},%`);
+  }
+  const sql = `SELECT * FROM movies ${where} ORDER BY ${sortCol} COLLATE NOCASE ${dir} LIMIT ? OFFSET ?`;
+  params.push(pageSize, (page - 1) * pageSize);
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Errore DB' });
+    // Conta totale filtrato
+    const countSql = `SELECT COUNT(*) as count FROM movies ${where}`;
+    db.get(countSql, genre && genre.trim() !== '' ? [`%${genre}%`] : [], (err2, countRow) => {
+      if (err2) return res.status(500).json({ error: 'Errore DB' });
+      res.json({
+        movies: rows,
+        total: countRow.count,
+        page,
+        pageSize
       });
-    }
-  );
+    });
+  });
 });
 
 // Endpoint per refresh DB
