@@ -6,14 +6,14 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 start() {
   echo "[movie-db] Avvio backend..."
-  cd "$DIR/backend" && npm run dev &
+  cd "$DIR/backend" && nodejs index.js &
   BACKEND_PID=$!
   echo $BACKEND_PID > "$DIR/backend.pid"
   echo "[movie-db] Avvio frontend..."
   cd "$DIR/frontend" && npm start &
   NPM_PID=$!
   # Attendi che il vero processo React sia avviato
-  sleep 3
+  sleep 15
   FRONTEND_PID=$(pgrep -P $NPM_PID node | head -n1)
   if [ -z "$FRONTEND_PID" ]; then
     # fallback: prendi il processo node più recente avviato da npm

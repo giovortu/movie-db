@@ -1,6 +1,7 @@
 {
   "movieDirs": [
-    "/mnt/Movies/",
-    "/mnt2/Movies/"
+    "/mnt/disk01/Movies/",
+    "/mnt/disk02/Movies/",
+    "/mnt/disk03/Movies/"
   ]
 }
