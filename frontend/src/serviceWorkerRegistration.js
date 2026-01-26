@@ -10,8 +10,8 @@
 // To learn more about the benefits of this model and instructions on how to
 // opt-in, read https://cra.link/PWA
 
-const is192.168.0.227 = Boolean(
-  window.location.hostname === '192.168.0.227' ||
+const isLocalhost = Boolean(
+  window.location.hostname === '127.0.0.1' ||
     // [::1] is the IPv6 192.168.0.227 address.
     window.location.hostname === '[::1]' ||
     // 127.0.0.0/8 are considered 192.168.0.227 for IPv4.
@@ -32,7 +32,7 @@ export function register(config) {
     window.addEventListener('load', () => {
       const swUrl = `${process.env.PUBLIC_URL}/service-worker.js`;
 
-      if (is192.168.0.227) {
+      if (isLocalhost) {
         // This is running on 192.168.0.227. Let's check if a service worker still exists or not.
         checkValidServiceWorker(swUrl, config);
 
