@@ -353,18 +353,18 @@ function MainApp() {
             ))}
           </select>
           <IconButton color="inherit" onClick={() => setConfirmRefresh(true)} title="Aggiorna database" disabled={refreshing}>
-                  <Dialog open={confirmRefresh} onClose={() => setConfirmRefresh(false)}>
-                    <Box sx={{ p: 3, minWidth: 300 }}>
-                      <Typography variant="h6" sx={{ mb: 2 }}>Sei sicuro di voler riscansionare il database?</Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>L'operazione potrebbe richiedere alcuni minuti e sovrascriverà i dati attuali.</Typography>
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                        <Button onClick={() => setConfirmRefresh(false)} color="secondary">Annulla</Button>
-                        <Button onClick={handleRefresh} color="primary" variant="contained" autoFocus>Conferma</Button>
-                      </Box>
-                    </Box>
-                  </Dialog>
             <RefreshIcon />
           </IconButton>
+      <Dialog open={confirmRefresh} onClose={() => setConfirmRefresh(false)}>
+        <Box sx={{ p: 3, minWidth: 300 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Sei sicuro di voler riscansionare il database?</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>L'operazione potrebbe richiedere alcuni minuti e sovrascriverà i dati attuali.</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+            <Button onClick={() => setConfirmRefresh(false)} color="secondary">Annulla</Button>
+            <Button onClick={handleRefresh} color="primary" variant="contained" autoFocus>Conferma</Button>
+          </Box>
+        </Box>
+      </Dialog>
           <IconButton color="inherit" onClick={handleOpenSetup} title="Setup cartelle">
             <SettingsIcon />
           </IconButton>
