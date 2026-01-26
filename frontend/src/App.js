@@ -18,6 +18,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-route
 const PAGE_SIZE = 12;
 
 function getImageUrl(path) {
+  console.log( path );
   if (!path) return undefined;
   if (path.startsWith('/img')) {
     // Usa la base URL del backend (porta 3001)
@@ -131,12 +132,20 @@ function MovieListItem({ movie, onDetails, onPoster }) {
 
 
 
+
 function MainApp() {
-    // Dialog di caricamento per refresh
-    const [loadingDialog, setLoadingDialog] = useState(false);
+  // Salva/ripristina pagina e ordinamento da localStorage
+  const getInitialPage = () => {
+    const val = localStorage.getItem('movie-db-page');
+    return val ? parseInt(val, 10) : 1;
+  };
+  const getInitialSortField = () => localStorage.getItem('movie-db-sortField') || 'title';
+  const getInitialSortDir = () => localStorage.getItem('movie-db-sortDir') || 'asc';
+
+  const [loadingDialog, setLoadingDialog] = useState(false);
   const [movies, setMovies] = useState([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(getInitialPage());
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('card');
   const [openSetup, setOpenSetup] = useState(false);
@@ -145,8 +154,8 @@ function MainApp() {
   const [refreshError, setRefreshError] = useState(false);
   const [detailsMovie, setDetailsMovie] = useState(null);
   const [posterDialog, setPosterDialog] = useState({ open: false, url: '', title: '' });
-  const [sortField, setSortField] = useState('title');
-  const [sortDir, setSortDir] = useState('asc');
+  const [sortField, setSortField] = useState(getInitialSortField());
+  const [sortDir, setSortDir] = useState(getInitialSortDir());
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -208,6 +217,18 @@ function MainApp() {
     setLoading(false);
   };
 
+
+  // Salva su localStorage quando cambiano
+  useEffect(() => {
+    localStorage.setItem('movie-db-page', page);
+  }, [page]);
+  useEffect(() => {
+    localStorage.setItem('movie-db-sortField', sortField);
+  }, [sortField]);
+  useEffect(() => {
+    localStorage.setItem('movie-db-sortDir', sortDir);
+  }, [sortDir]);
+
   useEffect(() => {
     fetchMovies(page, sortField, sortDir);
     // eslint-disable-next-line
@@ -233,10 +254,10 @@ function MainApp() {
             sx={{ background: 'rgba(255,255,255,0.1)', borderRadius: 1, mr: 2 }}
           >
             <ToggleButton value="list" aria-label="Lista">
-              <ViewListIcon />
+              <ViewListIcon sx={{ color: 'white' }} />
             </ToggleButton>
             <ToggleButton value="card" aria-label="Card">
-              <ViewModuleIcon />
+              <ViewModuleIcon sx={{ color: 'white' }} />
             </ToggleButton>
           </ToggleButtonGroup>
           <IconButton color="inherit" onClick={handleRefresh} title="Aggiorna database" disabled={refreshing}>
@@ -293,11 +314,11 @@ function MainApp() {
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', justifyContent: 'space-between', mb: 3, gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <span>Ordina per:</span>
-            <select value={sortField} onChange={e => { setSortField(e.target.value); setPage(1); }} style={{ fontSize: '1rem', padding: '4px 8px', borderRadius: 4 }}>
+            <select value={sortField} onChange={e => { setSortField(e.target.value); setPage(1); }} style={{ fontSize: '1rem', padding: '4px 8px', borderRadius: 4 }} data-testid="sort-field-select">
               <option value="title">Titolo</option>
               <option value="year">Anno</option>
             </select>
-            <select value={sortDir} onChange={e => { setSortDir(e.target.value); setPage(1); }} style={{ fontSize: '1rem', padding: '4px 8px', borderRadius: 4 }}>
+            <select value={sortDir} onChange={e => { setSortDir(e.target.value); setPage(1); }} style={{ fontSize: '1rem', padding: '4px 8px', borderRadius: 4 }} data-testid="sort-dir-select">
               <option value="asc">Crescente</option>
               <option value="desc">Decrescente</option>
             </select>

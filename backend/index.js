@@ -1,3 +1,4 @@
+
 require('dotenv').config();
 
 const express = require('express');
@@ -21,28 +22,27 @@ db.serialize(() => {
     plot TEXT,
     cover TEXT,
     poster TEXT,
-    year TEXT
+    year TEXT,
+    showtitle TEXT,
+    season TEXT,
+    episode TEXT,
+    aired TEXT,
+    rating TEXT,
+    imdbid TEXT,
+    tmdbid TEXT
   )`);
-    db.run(`CREATE TABLE IF NOT EXISTS movies (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      video TEXT,
-      nfo TEXT,
-      base TEXT,
-      dir TEXT,
-      title TEXT,
-      originaltitle TEXT,
-      plot TEXT,
-      year TEXT,
-      showtitle TEXT,
-      season TEXT,
-      episode TEXT,
-      aired TEXT,
-      rating TEXT,
-      imdbid TEXT,
-      tmdbid TEXT,
-      cover TEXT,
-      poster TEXT
-    )`);
+  db.run(`CREATE TABLE IF NOT EXISTS episodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    showtitle TEXT,
+    season TEXT,
+    episode TEXT,
+    title TEXT,
+    plot TEXT,
+    aired TEXT,
+    video TEXT,
+    nfo TEXT,
+    path TEXT
+  )`);
 });
 
 // Configurazione: cartelle film da file config.json o .env
@@ -53,6 +53,34 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Endpoint per ottenere gli episodi
+app.get('/api/episodes', (req, res) => {
+  const { showtitle, season, episode } = req.query;
+  let query = 'SELECT * FROM episodes';
+  const params = [];
+  const where = [];
+  if (showtitle) {
+    where.push('showtitle = ?');
+    params.push(showtitle);
+  }
+  if (season) {
+    where.push('season = ?');
+    params.push(season);
+  }
+  if (episode) {
+    where.push('episode = ?');
+    params.push(episode);
+  }
+  if (where.length) {
+    query += ' WHERE ' + where.join(' AND ');
+  }
+  query += ' ORDER BY season, episode';
+  db.all(query, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ episodes: rows });
+  });
+});
 
 // Endpoint per ottenere la configurazione (movieDirs)
 app.get('/api/setup', (req, res) => {
@@ -88,15 +116,12 @@ function loadMovieDirs() {
 var MOVIE_DIRS = loadMovieDirs();
 if (MOVIE_DIRS.length > 0) {
   // Espone un solo endpoint /img/*
-  app.get('/img/*', (req, res) => {
+  app.get(/^\/img\/(.+)/, (req, res) => {
     // req.params[0] contiene il path richiesto dopo /img/
     const reqPath = req.params[0];
-    // Trova la prima cartella che corrisponde al prefisso richiesto
     for (const dir of MOVIE_DIRS) {
-      // Normalizza il prefisso (es: "mnt/Movies" da "/img/mnt/Movies/...")
-      const prefix = dir.replace(/^[\/]+/, '').replace(/^[A-Za-z]:/, '').replace(/\\/g, '/');
+      const prefix = dir.replace(/^[\\/]+/, '').replace(/^[A-Za-z]:/, '').replace(/\\/g, '/');
       if (reqPath.startsWith(prefix)) {
-        // Costruisce il path assoluto del file richiesto
         const absPath = path.join(dir, reqPath.slice(prefix.length).replace(/^\//, ''));
         if (fs.existsSync(absPath)) {
           return res.sendFile(absPath);
@@ -179,27 +204,25 @@ async function refreshDatabase() {
   return new Promise(async (resolve, reject) => {
     db.serialize(() => {
       db.run('DELETE FROM movies');
+      db.run('DELETE FROM episodes');
     });
     let allMovies = [];
+    let seriesMap = {};
+    let singles = [];
+    let countSkipped = 0;
     for (const dir of MOVIE_DIRS) {
       allMovies = allMovies.concat(scanDirRecursive(dir));
     }
     console.log(`[DEBUG] Totale file video trovati da scanDirRecursive: ${allMovies.length}`);
     // Raggruppa per showtitle se presente, altrimenti inserisce come film singolo
-    const seriesMap = {};
-    const singles = [];
-    let countSkipped = 0;
     for (const m of allMovies) {
       try {
         const info = await getMovieInfoFromNfo(m.nfo);
-        //console.log(`[DEBUG] NFO: ${m.nfo} | info:`, info);
-        // Se è una serie ma manca il titolo episodio, usa il nome file video
         if (info.showtitle && !info.title && m.video) {
           info.title = path.basename(m.video, path.extname(m.video));
         }
         if (!info.title && !info.showtitle) {
           countSkipped++;
-          // Logga anche il contenuto del file NFO se parsing vuoto
           try {
             const raw = fs.readFileSync(m.nfo, 'utf8');
             console.log(`[DEBUG] Contenuto NFO vuoto/parsing fallito: ${m.nfo}\n${raw}`);
@@ -211,34 +234,35 @@ async function refreshDatabase() {
         if (info.showtitle) {
           const key = info.showtitle;
           if (!seriesMap[key]) {
+            // Cerca immagini -poster.archos.jpg e -fanart.archos.jpg nella cartella della serie
+            let foundPoster = null;
+            let foundFanart = null;
+            const dirIdx = MOVIE_DIRS.findIndex(d => m.video.startsWith(d));
+            const dirPrefix = dirIdx !== -1 ? MOVIE_DIRS[dirIdx].replace(/^[\\/]+/, '').replace(/^[A-Za-z]:/, '').replace(/\\/g, '/') : null;
+            const serieDir = m.dir;
+            if (fs.existsSync(serieDir)) {
+              const files = fs.readdirSync(serieDir);
+              for (const file of files) {
+                if (!foundPoster && file.endsWith('-poster.archos.jpg')) foundPoster = file;
+                if (!foundFanart && file.endsWith('-fanart.archos.jpg')) foundFanart = file;
+              }
+            }
+            let cover = null, poster = null;
+            if (foundPoster && dirPrefix) {
+              cover = `/img/${dirPrefix}/${path.relative(MOVIE_DIRS[dirIdx], path.join(serieDir, foundPoster)).replace(/\\/g, '/')}`;
+              poster = cover;
+            } else if (foundFanart && dirPrefix) {
+              cover = `/img/${dirPrefix}/${path.relative(MOVIE_DIRS[dirIdx], path.join(serieDir, foundFanart)).replace(/\\/g, '/')}`;
+              poster = null;
+            }
             seriesMap[key] = {
               showtitle: info.showtitle,
               plot: info.plot,
               year: info.year,
-              cover: null,
-              poster: null,
+              cover,
+              poster,
               episodes: []
             };
-          }
-          // Determina da quale cartella proviene il file
-          // Trova la cartella di origine e costruisce il path relativo per l'endpoint unico
-          const dirIdx = MOVIE_DIRS.findIndex(d => m.video.startsWith(d));
-          const dirPrefix = dirIdx !== -1 ? MOVIE_DIRS[dirIdx].replace(/^[\\/]+/, '').replace(/^[A-Za-z]:/, '').replace(/\\/g, '/') : null;
-          // Per le serie, cover = poster se esiste, altrimenti fanart
-          if (!seriesMap[key].cover) {
-            const poster = m.base + '-poster.archos.jpg';
-            const fanart = m.base + '-fanart.archos.jpg';
-            if (fs.existsSync(poster) && dirPrefix) {
-              let rel = path.relative(MOVIE_DIRS[dirIdx], poster).replace(/\\/g, '/');
-              rel = rel.replace(/^(\.\.\/)+/, '');
-              seriesMap[key].cover = `/img/${dirPrefix}/${rel}`;
-              seriesMap[key].poster = `/img/${dirPrefix}/${rel}`;
-            } else if (fs.existsSync(fanart) && dirPrefix) {
-              let rel = path.relative(MOVIE_DIRS[dirIdx], fanart).replace(/\\/g, '/');
-              rel = rel.replace(/^(\.\.\/)+/, '');
-              seriesMap[key].cover = `/img/${dirPrefix}/${rel}`;
-              seriesMap[key].poster = null;
-            }
           }
           seriesMap[key].episodes.push({
             title: info.title,
@@ -258,30 +282,32 @@ async function refreshDatabase() {
     console.log(`[DB] Film singoli trovati: ${singles.length}`);
     console.log(`[DB] Serie trovate: ${Object.keys(seriesMap).length}`);
     console.log(`[DB] Elementi saltati (vuoti): ${countSkipped}`);
-    // Inserisci serie TV (una riga per serie, dettagli episodi in JSON nel campo plot)
+    // Inserisci serie TV (una riga per serie)
     for (const key in seriesMap) {
       const serie = seriesMap[key];
       if (!serie.episodes || serie.episodes.length === 0) {
         console.log(`[DB] Serie saltata (nessun episodio): ${serie.showtitle}`);
         continue;
       }
+      // Check duplicato serie (showtitle+year)
+      const duplicateSerie = await new Promise(resolve => {
+        db.get('SELECT id FROM movies WHERE showtitle = ? AND year = ?', [serie.showtitle, serie.year], (err, row) => {
+          resolve(!!row);
+        });
+      });
+      if (duplicateSerie) {
+        console.log(`[DB] Serie duplicata saltata: ${serie.showtitle} (${serie.year})`);
+        continue;
+      }
       db.run(
-        `INSERT INTO movies (title, plot, year, showtitle, cover, poster, nfo, video, season, episode, aired, base, dir, originaltitle) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO movies (title, plot, year, showtitle, cover, poster) VALUES (?, ?, ?, ?, ?, ?)`,
         [
           serie.showtitle,
           serie.plot || '',
           serie.year,
           serie.showtitle,
           serie.cover,
-          serie.poster,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null
+          serie.poster
         ],
         function (err) {
           if (err) {
@@ -291,11 +317,61 @@ async function refreshDatabase() {
           }
         }
       );
+      // Inserisci episodi nella tabella episodes
+      for (const ep of serie.episodes) {
+        // Cerca immagine episodio (poster o fanart)
+        let epPath = null;
+        const dirIdx = MOVIE_DIRS.findIndex(d => ep.video && ep.video.startsWith(d));
+        const dirPrefix = dirIdx !== -1 ? MOVIE_DIRS[dirIdx].replace(/^[\\/]+/, '').replace(/^[A-Za-z]:/, '').replace(/\\/g, '/') : null;
+        if (ep.video && dirPrefix) {
+          const base = ep.video.replace(/\.[^.]+$/, '');
+          const poster = base + '-poster.archos.jpg';
+          const fanart = base + '-fanart.archos.jpg';
+          if (fs.existsSync(poster)) {
+            let rel = path.relative(MOVIE_DIRS[dirIdx], poster).replace(/\\/g, '/');
+            rel = rel.replace(/^(\.\.\/)+/, '');
+            epPath = `/img/${dirPrefix}/${rel}`;
+          } else if (fs.existsSync(fanart)) {
+            let rel = path.relative(MOVIE_DIRS[dirIdx], fanart).replace(/\\/g, '/');
+            rel = rel.replace(/^(\.\.\/)+/, '');
+            epPath = `/img/${dirPrefix}/${rel}`;
+          }
+        }
+        db.run(
+          `INSERT INTO episodes (showtitle, season, episode, title, plot, aired, video, nfo, path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            serie.showtitle,
+            ep.season,
+            ep.episode,
+            ep.title,
+            ep.plot || '',
+            ep.aired,
+            ep.video,
+            ep.nfo,
+            epPath
+          ],
+          function (err) {
+            if (err) {
+              console.error(`[DB] Errore inserimento episodio: ${serie.showtitle} S${ep.season}E${ep.episode}`, err);
+            }
+          }
+        );
+      }
     }
     // Inserisci film singoli
     for (const { m, info } of singles) {
       if (!info.title) {
         console.log(`[DB] Film singolo saltato (titolo vuoto): ${m.nfo}`);
+        continue;
+      }
+      // Check duplicato film (title+year)
+      const duplicateMovie = await new Promise(resolve => {
+        db.get('SELECT id FROM movies WHERE title = ? AND year = ?', [info.title, info.year], (err, row) => {
+          resolve(!!row);
+        });
+      });
+      if (duplicateMovie) {
+        console.log(`[DB] Film duplicato saltato: ${info.title} (${info.year})`);
         continue;
       }
       const cover = m.base + '-fanart.archos.jpg';
@@ -356,7 +432,6 @@ app.get('/api/movies', (req, res) => {
   let dir = req.query.dir === 'desc' ? 'DESC' : 'ASC';
   const allowedSort = { title: 'title', year: 'year' };
   let sortCol = allowedSort[sort] || 'title';
-  if (sortCol === 'year') sortCol = 'title';
   db.all(
     `SELECT * FROM movies ORDER BY ${sortCol} COLLATE NOCASE ${dir} LIMIT ? OFFSET ?`,
     [pageSize, (page - 1) * pageSize],
