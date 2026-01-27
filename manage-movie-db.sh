@@ -6,11 +6,11 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 start() {
   echo "[movie-db] Avvio backend..."
-  cd "$DIR/backend" && nodejs index.js &
+  cd "$DIR/backend" && /usr/bin/nohup  /usr/bin/node index.js &
   BACKEND_PID=$!
   echo $BACKEND_PID > "$DIR/backend.pid"
   echo "[movie-db] Avvio frontend..."
-  cd "$DIR/frontend" && npm start &
+  cd "$DIR/frontend" && /usr/bin/nohup npm start &
   NPM_PID=$!
   # Attendi che il vero processo React sia avviato
   sleep 15

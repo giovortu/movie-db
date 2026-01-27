@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=YOUR_USER
-WorkingDirectory=/data/Projects/PlatformIO/movie-db
-ExecStart=/bin/bash /data/Projects/PlatformIO/movie-db/manage-movie-db.sh start
-ExecStop=/bin/bash /data/Projects/PlatformIO/movie-db/manage-movie-db.sh stop
+User=giovortu
+WorkingDirectory=/home/giovortu/bin/movie-db
+ExecStart=/bin/bash /home/giovortu/bin/movie-db/manage-movie-db.sh start
+ExecStop=/bin/bash  /home/giovortu/bin/movie-db/manage-movie-db.sh stop
 Restart=on-failure
 
 [Install]
