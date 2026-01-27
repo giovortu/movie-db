@@ -3,11 +3,12 @@ Description=Movie DB Backend e Frontend
 After=network.target
 
 [Service]
-Type=simple
+Type=oneshot
+RemainAfterExit=yes
 User=giovortu
 WorkingDirectory=/home/giovortu/bin/movie-db
-ExecStart=/bin/bash /home/giovortu/bin/movie-db/manage-movie-db.sh start
-ExecStop=/bin/bash  /home/giovortu/bin/movie-db/manage-movie-db.sh stop
+ExecStart= /usr/bin/bash /home/giovortu/bin/movie-db/manage-movie-db.sh start
+ExecStop=  /usr/bin/bash /home/giovortu/bin/movie-db/manage-movie-db.sh stop
 Restart=on-failure
 
 [Install]
