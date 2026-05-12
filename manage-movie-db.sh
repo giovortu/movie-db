@@ -1,16 +1,18 @@
 #!/bin/bash
 
 # Script per avviare backend e frontend
-
+echo "CIAO"
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 start() {
   echo "[movie-db] Avvio backend..."
-  cd "$DIR/backend" && /usr/bin/nohup  /usr/bin/node index.js &
+  cd "$DIR/backend"
+  /usr/bin/node index.js &
   BACKEND_PID=$!
-  echo $BACKEND_PID > "$DIR/backend.pid"
+  echo $BACKEND_PID > "$DIR/backend_movie.pid"
   echo "[movie-db] Avvio frontend..."
-  cd "$DIR/frontend" && /usr/bin/nohup npm start &
+  cd "$DIR/frontend" 
+  npm start &
   NPM_PID=$!
   # Attendi che il vero processo React sia avviato
   sleep 15
@@ -19,17 +21,17 @@ start() {
     # fallback: prendi il processo node più recente avviato da npm
     FRONTEND_PID=$(ps --sort=-start_time -eo pid,ppid,cmd | grep "react-scripts start" | grep -v grep | awk '{print $1}' | head -n1)
   fi
-  echo $FRONTEND_PID > "$DIR/frontend.pid"
+  echo $FRONTEND_PID > "$DIR/frontend_movie.pid"
   echo "[movie-db] Backend PID: $BACKEND_PID, Frontend PID: $FRONTEND_PID (npm: $NPM_PID)"
 }
 
 stop() {
-  if [ -f "$DIR/backend.pid" ]; then
-    kill $(cat "$DIR/backend.pid") && rm "$DIR/backend.pid"
+  if [ -f "$DIR/backend_movie.pid" ]; then
+    kill $(cat "$DIR/backend_movie.pid") && rm "$DIR/backend_movie.pid"
     echo "[movie-db] Backend fermato."
   fi
   if [ -f "$DIR/frontend.pid" ]; then
-    kill $(cat "$DIR/frontend.pid") && rm "$DIR/frontend.pid"
+    kill $(cat "$DIR/frontend_movie.pid") && rm "$DIR/frontend_movie.pid"
     echo "[movie-db] Frontend fermato."
   fi
 }

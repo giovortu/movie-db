@@ -35,6 +35,8 @@ function MovieCard({ movie, onDetails, onPoster }) {
   // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
   const isSerie = !!movie.showtitle && (!movie.season && !movie.episode);
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
+  const movieAddress = "http://192.168.0.227:8086/" + movie.video.replace("/mnt/","/mount/")
+
 
   return (
     <Card sx={{ width: 260, minWidth: 260, maxWidth: 260, minHeight: 420, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -63,7 +65,7 @@ function MovieCard({ movie, onDetails, onPoster }) {
         {movie.genres && movie.genres.length > 0 && (
           <Typography variant="caption" color="primary" sx={{ mb: 1, mt: 1 }}>
             {movie.genres}
-          </Typography>
+         </Typography>
         )}
         <Typography
           variant="body2"
@@ -83,7 +85,7 @@ function MovieCard({ movie, onDetails, onPoster }) {
         >
           <ImageIcon />
         </Button>
-        <Button size="small" variant="outlined" href={movie.video} target="_blank" title="Apri Video">
+        <Button size="small" variant="outlined" href={movieAddress} target="_blank" title="Apri Video">
           <PlayArrowIcon />
         </Button>
         <Button size="small" variant="outlined" onClick={() => onDetails(movie)} title="Dettagli">
@@ -100,6 +102,9 @@ function MovieListItem({ movie, onDetails, onPoster }) {
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
   // Mostra il poster come immagine principale se presente, altrimenti la fanart (cover), altrimenti il placeholder
   const previewUrl = movie.poster ? getImageUrl(movie.poster) : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
+   const movieAddress = "http://192.168.0.227:8086/" + movie.video.replace("/mnt/","/mount/")
+
+
   return (
     <ListItem alignItems="center" sx={{ display: 'flex', alignItems: 'stretch', py: 1, width: 700, maxWidth: '100%' }} disableGutters>
       <Box sx={{ flex: '0 0 64px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -142,7 +147,7 @@ function MovieListItem({ movie, onDetails, onPoster }) {
         >
           <ImageIcon />
         </Button>
-        <Button size="small" variant="outlined" href={movie.video} target="_blank" title="Apri Video">
+        <Button size="small" variant="outlined" href={movieAddress} target="_blank" title="Apri Video">
           <PlayArrowIcon />
         </Button>
         <Button size="small" variant="outlined" onClick={() => onDetails(movie)} title="Dettagli">
