@@ -193,7 +193,6 @@ function MainApp() {
   const [episodes, setEpisodes] = useState([]);
   const [playerDialog, setPlayerDialog] = useState({ open: false, url: '', title: '' });
   const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
   const searchDebounceRef = useRef(null);
 
   // Utility per ottenere url assoluto per il player
@@ -281,7 +280,7 @@ function MainApp() {
     setOpenSetup(true);
   };
 
-  const fetchMovies = async (page, sort = sortField, dir = sortDir, genre = selectedGenre, pageSizeParam = pageSize, searchParam = debouncedSearch) => {
+  const fetchMovies = async (page, sort = sortField, dir = sortDir, genre = selectedGenre, pageSizeParam = pageSize, searchParam = search) => {
     setLoading(true);
     try {
       const params = { page, pageSize: pageSizeParam, sort, dir };
@@ -312,9 +311,9 @@ function MainApp() {
   }, [sortDir]);
 
   useEffect(() => {
-    fetchMovies(page, sortField, sortDir, selectedGenre, pageSize, debouncedSearch);
+    fetchMovies(page, sortField, sortDir, selectedGenre, pageSize, search);
     // eslint-disable-next-line
-  }, [page, sortField, sortDir, selectedGenre, pageSize, debouncedSearch]);
+  }, [page, sortField, sortDir, selectedGenre, pageSize]);
   useEffect(() => {
     localStorage.setItem('movie-db-pageSize', pageSize);
   }, [pageSize]);
@@ -323,14 +322,15 @@ function MainApp() {
     localStorage.setItem('movie-db-genre', selectedGenre);
   }, [selectedGenre]);
 
-  // Debounce ricerca: aggiorna debouncedSearch 300ms dopo l'ultima digitazione
+  // Debounce ricerca: aspetta 300ms dall'ultima digitazione, poi ricarica dalla pagina 1
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
-      setDebouncedSearch(search);
       setPage(1);
+      fetchMovies(1, sortField, sortDir, selectedGenre, pageSize, search);
     }, 300);
     return () => clearTimeout(searchDebounceRef.current);
+    // eslint-disable-next-line
   }, [search]);
 
   const handleView = (event, nextView) => {
