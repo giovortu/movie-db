@@ -526,8 +526,13 @@ app.get('/api/movies', (req, res) => {
   let params = [];
 
   if (genre && genre.trim() !== '') {
-    conditions.push(`(',' || lower(genres) || ',') LIKE ?`);
-    params.push(`%,${genre.trim().toLowerCase()},%`);
+    if (genre.trim() === '__serie__') {
+      // Filtro speciale: solo serie TV (showtitle non nullo e non vuoto)
+      conditions.push(`(showtitle IS NOT NULL AND showtitle != '')`);
+    } else {
+      conditions.push(`(',' || lower(genres) || ',') LIKE ?`);
+      params.push(`%,${genre.trim().toLowerCase()},%`);
+    }
   }
   if (search !== '') {
     conditions.push(`(title LIKE ? OR originaltitle LIKE ? OR showtitle LIKE ?)`);

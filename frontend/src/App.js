@@ -517,6 +517,7 @@ function MainApp() {
             </select>
             <select value={selectedGenre} onChange={e => { setSelectedGenre(e.target.value); setPage(1); }} style={{ fontSize: '1rem', padding: '4px 8px', borderRadius: 4, minWidth: 120 }} data-testid="genre-select">
               <option value="">Tutti i generi</option>
+              <option value="__serie__">📺 Serie TV</option>
               {genres.map(g => (
                 <option key={g} value={g}>{g}</option>
               ))}
