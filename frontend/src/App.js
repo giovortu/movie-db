@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import {
-  AppBar, Toolbar, Typography, Container, Grid, Card, CardMedia, CardContent, CardActions, Button, IconButton, List, ListItem, ListItemAvatar, ListItemText, Avatar, Pagination, ToggleButton, ToggleButtonGroup, CircularProgress, Box, Snackbar, Alert, TextField, InputAdornment
+  AppBar, Toolbar, Typography, Container, Grid, Card, CardMedia, CardContent, CardActions, Button, IconButton, List, ListItem, ListItemText, Avatar, Pagination, ToggleButton, ToggleButtonGroup, CircularProgress, Box, Snackbar, Alert, TextField, InputAdornment,
+  Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -16,7 +18,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import axios from 'axios';
 import Setup from './Setup';
 import Dialog from '@mui/material/Dialog';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 const PAGE_SIZE_OPTIONS = [3, 4, 6, 8, 12, 24, 48];
 const API_BASE = (process.env.REACT_APP_API || 'http://192.168.0.227:4001').replace(/\/$/, '');
@@ -30,7 +32,100 @@ function getImageUrl(path) {
   return path;
 }
 
-function MovieCard({ movie, onDetails, onPoster }) {
+function SeriesPlayDialog({ open, movie, onClose }) {
+  const [episodes, setEpisodes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [expandedSeason, setExpandedSeason] = useState(null);
+
+  useEffect(() => {
+    if (!open || !movie) return;
+    setLoading(true);
+    setExpandedSeason(null);
+    axios.get(`${API_BASE}/api/episodes`, { params: { showtitle: movie.showtitle } })
+      .then(res => { setEpisodes(res.data.episodes || []); setLoading(false); })
+      .catch(() => { setEpisodes([]); setLoading(false); });
+  }, [open, movie]);
+
+  // Raggruppa episodi per stagione e ordina
+  const seasons = {};
+  for (const ep of episodes) {
+    const s = ep.season || '?';
+    if (!seasons[s]) seasons[s] = [];
+    seasons[s].push(ep);
+  }
+  const seasonKeys = Object.keys(seasons).sort((a, b) => {
+    if (a === '?') return 1;
+    if (b === '?') return -1;
+    return parseInt(a) - parseInt(b);
+  });
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <Box p={2}>
+        <Typography variant="h6" gutterBottom>{movie?.showtitle || movie?.title}</Typography>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>
+        ) : episodes.length === 0 ? (
+          <Typography color="text.secondary">Nessun episodio trovato.</Typography>
+        ) : (
+          seasonKeys.map(season => (
+            <Accordion
+              key={season}
+              expanded={expandedSeason === season}
+              onChange={() => setExpandedSeason(expandedSeason === season ? null : season)}
+              disableGutters
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  {season === '?' ? 'Stagione sconosciuta' : `Stagione ${season}`}
+                  <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                    ({seasons[season].length} ep.)
+                  </Typography>
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ p: 0 }}>
+                <List dense disablePadding>
+                  {[...seasons[season]]
+                    .sort((a, b) => (parseInt(a.episode) || 0) - (parseInt(b.episode) || 0))
+                    .map(ep => {
+                      const epAddress = ep.video
+                        ? `${VIDEO_BASE}/${ep.video.replace('/mnt/', '/mount/')}`
+                        : null;
+                      return (
+                        <ListItem
+                          key={ep.id}
+                          secondaryAction={
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              href={epAddress || undefined}
+                              target="_blank"
+                              disabled={!epAddress}
+                              component={epAddress ? 'a' : 'span'}
+                              title="Riproduci episodio"
+                            >
+                              <PlayArrowIcon />
+                            </IconButton>
+                          }
+                        >
+                          <ListItemText
+                            primary={`Ep. ${ep.episode || '?'} — ${ep.title || '(senza titolo)'}`}
+                            secondary={ep.aired || undefined}
+                          />
+                        </ListItem>
+                      );
+                    })}
+                </List>
+              </AccordionDetails>
+            </Accordion>
+          ))
+        )}
+      </Box>
+    </Dialog>
+  );
+}
+
+function MovieCard({ movie, onDetails, onPoster, onPlay }) {
   // Mostra il poster come immagine principale se presente, altrimenti la fanart (cover), altrimenti il placeholder
   const previewUrl = movie.poster ? getImageUrl(movie.poster) : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
   // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
@@ -85,7 +180,15 @@ function MovieCard({ movie, onDetails, onPoster }) {
         >
           <ImageIcon />
         </Button>
-        <Button size="small" variant="outlined" href={movieAddress || undefined} target="_blank" title="Apri Video" disabled={!movieAddress}>
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={isSerie ? () => onPlay(movie) : undefined}
+          href={!isSerie ? (movieAddress || undefined) : undefined}
+          target={!isSerie ? "_blank" : undefined}
+          title={isSerie ? "Episodi" : "Apri Video"}
+          disabled={!isSerie && !movieAddress}
+        >
           <PlayArrowIcon />
         </Button>
         <Button size="small" variant="outlined" onClick={() => onDetails(movie)} title="Dettagli">
@@ -96,7 +199,7 @@ function MovieCard({ movie, onDetails, onPoster }) {
   );
 }
 
-function MovieListItem({ movie, onDetails, onPoster }) {
+function MovieListItem({ movie, onDetails, onPoster, onPlay }) {
   // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
   const isSerie = !!movie.showtitle && (!movie.season && !movie.episode);
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
@@ -147,7 +250,15 @@ function MovieListItem({ movie, onDetails, onPoster }) {
         >
           <ImageIcon />
         </Button>
-        <Button size="small" variant="outlined" href={movieAddress || undefined} target="_blank" title="Apri Video" disabled={!movieAddress}>
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={isSerie ? () => onPlay(movie) : undefined}
+          href={!isSerie ? (movieAddress || undefined) : undefined}
+          target={!isSerie ? "_blank" : undefined}
+          title={isSerie ? "Episodi" : "Apri Video"}
+          disabled={!isSerie && !movieAddress}
+        >
           <PlayArrowIcon />
         </Button>
         <Button size="small" variant="outlined" onClick={() => onDetails(movie)} title="Dettagli">
@@ -194,6 +305,7 @@ function MainApp() {
   const [playerDialog, setPlayerDialog] = useState({ open: false, url: '', title: '' });
   const [search, setSearch] = useState('');
   const searchDebounceRef = useRef(null);
+  const [seriesDialog, setSeriesDialog] = useState({ open: false, movie: null });
 
   // Utility per ottenere url assoluto per il player
   function getPlayerUrl(url) {
@@ -539,7 +651,7 @@ function MainApp() {
             <Grid container spacing={3}>
               {movies.map((movie, idx) => (
                 <Grid item xs={12} sm={6} md={4} lg={3} key={idx}>
-                  <MovieCard movie={movie} onDetails={setDetailsMovie} onPoster={(url, title) => setPosterDialog({ open: true, url: getImageUrl(url), title })} />
+                  <MovieCard movie={movie} onDetails={setDetailsMovie} onPoster={(url, title) => setPosterDialog({ open: true, url: getImageUrl(url), title })} onPlay={(m) => setSeriesDialog({ open: true, movie: m })} />
                 </Grid>
               ))}
             </Grid>
@@ -547,7 +659,7 @@ function MainApp() {
             <Box sx={{ width: { xs: '100%', md: '66.666%' }, mx: 'auto' }}>
               <List>
                 {movies.map((movie, idx) => (
-                  <MovieListItem movie={movie} key={idx} onDetails={setDetailsMovie} onPoster={(url, title) => setPosterDialog({ open: true, url: getImageUrl(url), title })} />
+                  <MovieListItem movie={movie} key={idx} onDetails={setDetailsMovie} onPoster={(url, title) => setPosterDialog({ open: true, url: getImageUrl(url), title })} onPlay={(m) => setSeriesDialog({ open: true, movie: m })} />
                 ))}
               </List>
             </Box>
@@ -562,6 +674,11 @@ function MainApp() {
           />
         </Box>
       </Container>
+      <SeriesPlayDialog
+        open={seriesDialog.open}
+        movie={seriesDialog.movie}
+        onClose={() => setSeriesDialog({ open: false, movie: null })}
+      />
     </Box>
   );
 }
