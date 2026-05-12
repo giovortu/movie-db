@@ -32,6 +32,15 @@ function getImageUrl(path) {
   return path;
 }
 
+// Costruisce l'URL del video codificando correttamente ogni segmento del path
+// (gestisce spazi, parentesi e altri caratteri speciali nei nomi di file/cartelle)
+function buildVideoUrl(videoPath) {
+  if (!videoPath) return null;
+  const mountPath = videoPath.replace('/mnt/', '/mount/');
+  const encoded = mountPath.split('/').map(seg => encodeURIComponent(seg)).join('/');
+  return `${VIDEO_BASE}${encoded}`;
+}
+
 function SeriesPlayDialog({ open, movie, onClose }) {
   const [episodes, setEpisodes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -89,7 +98,7 @@ function SeriesPlayDialog({ open, movie, onClose }) {
                     .sort((a, b) => (parseInt(a.episode) || 0) - (parseInt(b.episode) || 0))
                     .map(ep => {
                       const epAddress = ep.video
-                        ? `${VIDEO_BASE}/${ep.video.replace('/mnt/', '/mount/')}`
+                        ? buildVideoUrl(ep.video)
                         : null;
                       return (
                         <ListItem
@@ -131,7 +140,7 @@ function MovieCard({ movie, onDetails, onPoster, onPlay }) {
   // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
   const isSerie = !!movie.showtitle && (!movie.season && !movie.episode);
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
-  const movieAddress = movie.video ? `${VIDEO_BASE}/${movie.video.replace("/mnt/", "/mount/")}` : null;
+  const movieAddress = movie.video ? buildVideoUrl(movie.video) : null;
 
   return (
     <Card sx={{ width: 260, minWidth: 260, maxWidth: 260, minHeight: 420, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -205,7 +214,7 @@ function MovieListItem({ movie, onDetails, onPoster, onPlay }) {
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
   // Mostra il poster come immagine principale se presente, altrimenti la fanart (cover), altrimenti il placeholder
   const previewUrl = movie.poster ? getImageUrl(movie.poster) : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
-  const movieAddress = movie.video ? `${VIDEO_BASE}/${movie.video.replace("/mnt/", "/mount/")}` : null;
+  const movieAddress = movie.video ? buildVideoUrl(movie.video) : null;
 
 
   return (
