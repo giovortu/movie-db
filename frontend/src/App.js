@@ -1,9 +1,11 @@
 
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
-  AppBar, Toolbar, Typography, Container, Grid, Card, CardMedia, CardContent, CardActions, Button, IconButton, List, ListItem, ListItemAvatar, ListItemText, Avatar, Pagination, ToggleButton, ToggleButtonGroup, CircularProgress, Box, Snackbar, Alert
+  AppBar, Toolbar, Typography, Container, Grid, Card, CardMedia, CardContent, CardActions, Button, IconButton, List, ListItem, ListItemAvatar, ListItemText, Avatar, Pagination, ToggleButton, ToggleButtonGroup, CircularProgress, Box, Snackbar, Alert, TextField, InputAdornment
 } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
+import ClearIcon from '@mui/icons-material/Clear';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -190,6 +192,9 @@ function MainApp() {
   const [pageSize, setPageSize] = useState(getInitialPageSize());
   const [episodes, setEpisodes] = useState([]);
   const [playerDialog, setPlayerDialog] = useState({ open: false, url: '', title: '' });
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchDebounceRef = useRef(null);
 
   // Utility per ottenere url assoluto per il player
   function getPlayerUrl(url) {
@@ -276,16 +281,12 @@ function MainApp() {
     setOpenSetup(true);
   };
 
-  const fetchMovies = async (page, sort = sortField, dir = sortDir, genre = selectedGenre, pageSizeParam = pageSize) => {
+  const fetchMovies = async (page, sort = sortField, dir = sortDir, genre = selectedGenre, pageSizeParam = pageSize, searchParam = debouncedSearch) => {
     setLoading(true);
     try {
-      const params = {
-        page,
-        pageSize: pageSizeParam,
-        sort,
-        dir,
-      };
+      const params = { page, pageSize: pageSizeParam, sort, dir };
       if (genre && genre !== '') params.genre = genre;
+      if (searchParam && searchParam !== '') params.search = searchParam;
       const res = await axios.get(`${API_BASE}/api/movies`, { params });
       let filtered = res.data.movies;
       let total = res.data.total;
@@ -311,9 +312,9 @@ function MainApp() {
   }, [sortDir]);
 
   useEffect(() => {
-    fetchMovies(page, sortField, sortDir, selectedGenre, pageSize);
+    fetchMovies(page, sortField, sortDir, selectedGenre, pageSize, debouncedSearch);
     // eslint-disable-next-line
-  }, [page, sortField, sortDir, selectedGenre, pageSize]);
+  }, [page, sortField, sortDir, selectedGenre, pageSize, debouncedSearch]);
   useEffect(() => {
     localStorage.setItem('movie-db-pageSize', pageSize);
   }, [pageSize]);
@@ -321,6 +322,16 @@ function MainApp() {
   useEffect(() => {
     localStorage.setItem('movie-db-genre', selectedGenre);
   }, [selectedGenre]);
+
+  // Debounce ricerca: aggiorna debouncedSearch 300ms dopo l'ultima digitazione
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(searchDebounceRef.current);
+  }, [search]);
 
   const handleView = (event, nextView) => {
     if (nextView !== null) setView(nextView);
@@ -479,7 +490,22 @@ function MainApp() {
       </Snackbar>
       <Container sx={{ mt: 4 }}>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', justifyContent: 'space-between', mb: 3, gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <TextField
+              size="small"
+              placeholder="Cerca titolo…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+                endAdornment: search ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearch('')}><ClearIcon fontSize="small" /></IconButton>
+                  </InputAdornment>
+                ) : null,
+              }}
+              sx={{ minWidth: 200 }}
+            />
             <span>Ordina per:</span>
             <select value={sortField} onChange={e => { setSortField(e.target.value); setPage(1); }} style={{ fontSize: '1rem', padding: '4px 8px', borderRadius: 4 }} data-testid="sort-field-select">
               <option value="title">Titolo</option>

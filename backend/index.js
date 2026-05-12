@@ -521,27 +521,30 @@ app.get('/api/movies', (req, res) => {
   const allowedSort = { title: 'title', year: 'year' };
   let sortCol = allowedSort[sort] || 'title';
   const genre = req.query.genre;
-  let where = '';
+  const search = req.query.search ? req.query.search.trim() : '';
+  const conditions = [];
   let params = [];
+
   if (genre && genre.trim() !== '') {
-    // Filtro esatto: trova il genere come parola intera nella lista separata da virgole, case-insensitive
-    where = `WHERE (',' || lower(genres) || ',') LIKE ?`;
+    conditions.push(`(',' || lower(genres) || ',') LIKE ?`);
     params.push(`%,${genre.trim().toLowerCase()},%`);
   }
+  if (search !== '') {
+    conditions.push(`(title LIKE ? OR originaltitle LIKE ? OR showtitle LIKE ?)`);
+    const like = `%${search}%`;
+    params.push(like, like, like);
+  }
+
+  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   const sql = `SELECT * FROM movies ${where} ORDER BY ${sortCol} COLLATE NOCASE ${dir} LIMIT ? OFFSET ?`;
   params.push(pageSize, (page - 1) * pageSize);
   db.all(sql, params, (err, rows) => {
     if (err) return res.status(500).json({ error: 'Errore DB' });
-    // Conta totale filtrato
+    const countParams = params.slice(0, params.length - 2);
     const countSql = `SELECT COUNT(*) as count FROM movies ${where}`;
-    db.get(countSql, genre && genre.trim() !== '' ? [`%${genre}%`] : [], (err2, countRow) => {
+    db.get(countSql, countParams, (err2, countRow) => {
       if (err2) return res.status(500).json({ error: 'Errore DB' });
-      res.json({
-        movies: rows,
-        total: countRow.count,
-        page,
-        pageSize
-      });
+      res.json({ movies: rows, total: countRow.count, page, pageSize });
     });
   });
 });
