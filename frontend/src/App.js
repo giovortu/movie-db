@@ -34,7 +34,10 @@ function MovieCard({ movie, onDetails, onPoster }) {
   // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
   const isSerie = !!movie.showtitle && (!movie.season && !movie.episode);
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
-  const movieAddress = movie.video ? `${VIDEO_BASE}/${movie.video.replace("/mnt/", "/mount/")}` : null; sx={{ width: 260, minWidth: 260, maxWidth: 260, minHeight: 420, height: '100%', display: 'flex', flexDirection: 'column' }}>
+  const movieAddress = movie.video ? `${VIDEO_BASE}/${movie.video.replace("/mnt/", "/mount/")}` : null;
+
+  return (
+    <Card sx={{ width: 260, minWidth: 260, maxWidth: 260, minHeight: 420, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardMedia
         component="img"
         height="200"
