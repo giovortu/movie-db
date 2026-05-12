@@ -63,6 +63,10 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
 
 // Endpoint per ottenere tutti i generi disponibili
 app.get('/api/genres', (req, res) => {
@@ -113,13 +117,6 @@ app.get('/api/setup', (req, res) => {
   }
   res.json({ movieDirs });
 });
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  next();
-});
-
-
-
 // Configurazione: cartelle film da file config.json o .env
 function loadMovieDirs() {
   if (fs.existsSync(CONFIG_PATH)) {
@@ -162,114 +159,34 @@ function getMovieInfoFromNfo(nfoPath) {
     'Adventure': 'Avventura',
     'Animation': 'Animazione',
     'Biography': 'Biografico',
+    'Children': 'Bambini',
     'Comedy': 'Commedia',
-    'Crime': 'Crime',
+    'Crime': 'Crimine',
     'Documentary': 'Documentario',
     'Drama': 'Drammatico',
+    'Erotic': 'Erotico',
+    'Experimental': 'Sperimentale',
     'Family': 'Famiglia',
     'Fantasy': 'Fantasy',
+    'Film-Noir': 'Noir',
+    'Game-Show': 'Game Show',
     'History': 'Storico',
     'Horror': 'Horror',
     'Music': 'Musicale',
     'Musical': 'Musical',
     'Mystery': 'Mistero',
+    'News': 'Notizie',
+    'Reality-TV': 'Reality',
     'Romance': 'Romantico',
     'Sci-Fi': 'Fantascienza',
     'Science Fiction': 'Fantascienza',
-    'Sport': 'Sportivo',
-    'Thriller': 'Thriller',
-    'War': 'Guerra',
-    'Western': 'Western',
-    'Talk-Show': 'Talk Show',
-    'Game-Show': 'Game Show',
-    'Reality-TV': 'Reality',
-    'News': 'Notizie',
     'Short': 'Corto',
-    'Film-Noir': 'Noir',
-    'Adult': 'Adulto',
-    'Animation': 'Animazione',
-    'Children': 'Bambini',
-    'Erotic': 'Erotico',
-    'Experimental': 'Sperimentale',
+    'Sport': 'Sportivo',
     'Superhero': 'Supereroi',
-    'Crime': 'Crimine',
-    'Documentary': 'Documentario',
-    'Biography': 'Biografico',
-    'History': 'Storico',
-    'Music': 'Musicale',
-    'Musical': 'Musical',
-    'News': 'Notizie',
-    'Reality-TV': 'Reality',
-    'Short': 'Corto',
     'Talk-Show': 'Talk Show',
-    'Game-Show': 'Game Show',
-    'Western': 'Western',
-    'War': 'Guerra',
-    'Romance': 'Romantico',
-    'Mystery': 'Mistero',
-    'Fantasy': 'Fantasy',
-    'Family': 'Famiglia',
-    'Drama': 'Drammatico',
-    'Crime': 'Crimine',
-    'Comedy': 'Commedia',
-    'Adventure': 'Avventura',
-    'Action': 'Azione',
-    'Horror': 'Horror',
     'Thriller': 'Thriller',
-    'Sci-Fi': 'Fantascienza',
-    'Sport': 'Sportivo',
-    'Animation': 'Animazione',
-    'Documentary': 'Documentario',
-    'Biography': 'Biografico',
-    'History': 'Storico',
-    'Music': 'Musicale',
-    'Musical': 'Musical',
-    'News': 'Notizie',
-    'Reality-TV': 'Reality',
-    'Short': 'Corto',
-    'Talk-Show': 'Talk Show',
-    'Game-Show': 'Game Show',
-    'Western': 'Western',
     'War': 'Guerra',
-    'Romance': 'Romantico',
-    'Mystery': 'Mistero',
-    'Fantasy': 'Fantasy',
-    'Family': 'Famiglia',
-    'Drama': 'Drammatico',
-    'Crime': 'Crimine',
-    'Comedy': 'Commedia',
-    'Adventure': 'Avventura',
-    'Action': 'Azione',
-    'Horror': 'Horror',
-    'Thriller': 'Thriller',
-    'Sci-Fi': 'Fantascienza',
-    'Sport': 'Sportivo',
-    'Animation': 'Animazione',
-    'Documentary': 'Documentario',
-    'Biography': 'Biografico',
-    'History': 'Storico',
-    'Music': 'Musicale',
-    'Musical': 'Musical',
-    'News': 'Notizie',
-    'Reality-TV': 'Reality',
-    'Short': 'Corto',
-    'Talk-Show': 'Talk Show',
-    'Game-Show': 'Game Show',
     'Western': 'Western',
-    'War': 'Guerra',
-    'Romance': 'Romantico',
-    'Mystery': 'Mistero',
-    'Fantasy': 'Fantasy',
-    'Family': 'Famiglia',
-    'Drama': 'Drammatico',
-    'Crime': 'Crimine',
-    'Comedy': 'Commedia',
-    'Adventure': 'Avventura',
-    'Action': 'Azione',
-    'Horror': 'Horror',
-    'Thriller': 'Thriller',
-    'Sci-Fi': 'Fantascienza',
-    'Sport': 'Sportivo',
   };
   return new Promise((resolve, reject) => {
     fs.readFile(nfoPath, 'utf8', (err, data) => {

@@ -17,14 +17,13 @@ import Dialog from '@mui/material/Dialog';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 
 const PAGE_SIZE_OPTIONS = [3, 4, 6, 8, 12, 24, 48];
+const API_BASE = (process.env.REACT_APP_API || 'http://192.168.0.227:4001').replace(/\/$/, '');
+const VIDEO_BASE = (process.env.REACT_APP_VIDEO_BASE || 'http://192.168.0.227:8086').replace(/\/$/, '');
 
 function getImageUrl(path) {
-  console.log( path );
   if (!path) return undefined;
   if (path.startsWith('/img')) {
-    // Usa la base URL del backend (porta 4001)
-    const api = process.env.REACT_APP_API || 'http://192.168.0.227:4001';
-    return api.replace(/\/$/, '') + path;
+    return API_BASE + path;
   }
   return path;
 }
@@ -35,11 +34,7 @@ function MovieCard({ movie, onDetails, onPoster }) {
   // Se è una serie (ha showtitle e non ha season/episode), aggiungi (Serie) al titolo
   const isSerie = !!movie.showtitle && (!movie.season && !movie.episode);
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
-  const movieAddress = "http://192.168.0.227:8086/" + movie.video.replace("/mnt/","/mount/")
-
-
-  return (
-    <Card sx={{ width: 260, minWidth: 260, maxWidth: 260, minHeight: 420, height: '100%', display: 'flex', flexDirection: 'column' }}>
+  const movieAddress = movie.video ? `${VIDEO_BASE}/${movie.video.replace("/mnt/", "/mount/")}` : null; sx={{ width: 260, minWidth: 260, maxWidth: 260, minHeight: 420, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardMedia
         component="img"
         height="200"
@@ -85,7 +80,7 @@ function MovieCard({ movie, onDetails, onPoster }) {
         >
           <ImageIcon />
         </Button>
-        <Button size="small" variant="outlined" href={movieAddress} target="_blank" title="Apri Video">
+        <Button size="small" variant="outlined" href={movieAddress || undefined} target="_blank" title="Apri Video" disabled={!movieAddress}>
           <PlayArrowIcon />
         </Button>
         <Button size="small" variant="outlined" onClick={() => onDetails(movie)} title="Dettagli">
@@ -102,7 +97,7 @@ function MovieListItem({ movie, onDetails, onPoster }) {
   const displayTitle = (movie.title || movie.originaltitle) + (isSerie ? ' (Serie)' : '');
   // Mostra il poster come immagine principale se presente, altrimenti la fanart (cover), altrimenti il placeholder
   const previewUrl = movie.poster ? getImageUrl(movie.poster) : (movie.cover ? getImageUrl(movie.cover) : process.env.PUBLIC_URL + '/no-image.svg');
-   const movieAddress = "http://192.168.0.227:8086/" + movie.video.replace("/mnt/","/mount/")
+  const movieAddress = movie.video ? `${VIDEO_BASE}/${movie.video.replace("/mnt/", "/mount/")}` : null;
 
 
   return (
@@ -147,7 +142,7 @@ function MovieListItem({ movie, onDetails, onPoster }) {
         >
           <ImageIcon />
         </Button>
-        <Button size="small" variant="outlined" href={movieAddress} target="_blank" title="Apri Video">
+        <Button size="small" variant="outlined" href={movieAddress || undefined} target="_blank" title="Apri Video" disabled={!movieAddress}>
           <PlayArrowIcon />
         </Button>
         <Button size="small" variant="outlined" onClick={() => onDetails(movie)} title="Dettagli">
@@ -217,7 +212,7 @@ function MainApp() {
       const showtitle = detailsMovie.showtitle;
       const normalizedShowtitle = normalizeTitle(showtitle);
       console.log('Dettagli serie aperti, showtitle:', showtitle, 'normalizzato:', normalizedShowtitle);
-      axios.get('http://192.168.0.227:4001/api/episodes', { params: { showtitle } })
+      axios.get(`${API_BASE}/api/episodes`, { params: { showtitle } })
         .then(res => {
           // Filtro anche lato frontend per sicurezza
           const episodes = (res.data.episodes || []).filter(ep => normalizeTitle(ep.showtitle) === normalizedShowtitle);
@@ -234,7 +229,7 @@ function MainApp() {
   }, [detailsMovie]);
   // Carica i generi dal backend
   useEffect(() => {
-    axios.get('http://192.168.0.227:4001/api/genres')
+    axios.get(`${API_BASE}/api/genres`)
       .then(res => setGenres(res.data.genres || []))
       .catch(() => setGenres([]));
   }, []);
@@ -243,7 +238,7 @@ function MainApp() {
     setRefreshing(true);
     setLoadingDialog(true);
     try {
-      const res = await axios.post('http://192.168.0.227:4001/api/refresh');
+      const res = await axios.post(`${API_BASE}/api/refresh`);
       if (res.status !== 200) {
         setRefreshError(true);
         console.error('Errore API refresh:', res);
@@ -267,10 +262,8 @@ function MainApp() {
       </Dialog>
 
   const handleOpenSetup = async () => {
-    const apiUrl = 'http://192.168.0.227:4001/api/setup';
-    console.log('handleOpenSetup chiamato, url:', apiUrl);
     try {
-      const res = await axios.get(apiUrl);
+      const res = await axios.get(`${API_BASE}/api/setup`);
       console.log('API /api/setup response:', res.data);
       setSetupInitial(res.data.movieDirs || []);
     } catch (e) {
@@ -290,7 +283,7 @@ function MainApp() {
         dir,
       };
       if (genre && genre !== '') params.genre = genre;
-      const res = await axios.get('http://192.168.0.227:4001/api/movies', { params });
+      const res = await axios.get(`${API_BASE}/api/movies`, { params });
       let filtered = res.data.movies;
       let total = res.data.total;
       setMovies(filtered);
