@@ -565,8 +565,51 @@ app.post('/api/refresh', async (req, res) => {
 });
 
 
-// Endpoint per salvare la configurazione (movieDirs)
-app.post('/api/setup', (req, res) => {
+// Endpoint per cancellare un film (video, nfo, immagini) e rimuoverlo dal DB
+app.delete('/api/movies/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) return res.status(400).json({ error: 'ID non valido' });
+
+  db.get('SELECT * FROM movies WHERE id = ?', [id], (err, movie) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!movie) return res.status(404).json({ error: 'Film non trovato' });
+
+    // Converte un URL /img/... nel percorso assoluto su filesystem
+    function imgUrlToPath(url) {
+      if (!url) return null;
+      return '/' + url.replace(/^\/img\//, '');
+    }
+
+    const filesToDelete = [
+      movie.video,
+      movie.nfo,
+      imgUrlToPath(movie.cover),
+      imgUrlToPath(movie.poster),
+    ].filter(Boolean);
+
+    const deleted = [];
+    const failed = [];
+    for (const f of filesToDelete) {
+      try {
+        if (fs.existsSync(f)) {
+          fs.unlinkSync(f);
+          deleted.push(f);
+          console.log(`[DELETE] Rimosso: ${f}`);
+        }
+      } catch (e) {
+        failed.push(f);
+        console.error(`[DELETE] Errore rimozione ${f}:`, e.message);
+      }
+    }
+
+    db.run('DELETE FROM movies WHERE id = ?', [id], (err2) => {
+      if (err2) return res.status(500).json({ error: err2.message });
+      res.json({ success: true, deleted, failed });
+    });
+  });
+});
+
+
   const { movieDirs } = req.body;
   if (!Array.isArray(movieDirs) || movieDirs.length === 0) {
     return res.status(400).json({ error: 'movieDirs mancante o vuoto' });

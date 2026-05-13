@@ -315,6 +315,8 @@ function MainApp() {
   const [search, setSearch] = useState('');
   const searchDebounceRef = useRef(null);
   const [seriesDialog, setSeriesDialog] = useState({ open: false, movie: null });
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // movie da eliminare
+  const [deleteError, setDeleteError] = useState(false);
 
   // Utility per ottenere url assoluto per il player
   function getPlayerUrl(url) {
@@ -533,10 +535,25 @@ function MainApp() {
               />
             </Box>
             <Typography variant="body1" gutterBottom><b>Trama:</b> {detailsMovie.plot}</Typography>
-            {detailsMovie.poster && (
-              <Button size="small" variant="outlined" onClick={() => setPosterDialog({ open: true, url: getImageUrl(detailsMovie.poster), title: detailsMovie.title })} sx={{ mr: 1 }}>Poster</Button>
+            {detailsMovie.video && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', wordBreak: 'break-all', mb: 1 }}>
+                <b>File:</b> {detailsMovie.video}
+              </Typography>
             )}
-            <Button size="small" variant="outlined" href={detailsMovie.video} target="_blank">Apri Video</Button>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+              {detailsMovie.poster && (
+                <Button size="small" variant="outlined" onClick={() => setPosterDialog({ open: true, url: getImageUrl(detailsMovie.poster), title: detailsMovie.title })} sx={{ mr: 1 }}>Poster</Button>
+              )}
+              <Button size="small" variant="outlined" href={detailsMovie.video} target="_blank">Apri Video</Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                onClick={() => setDeleteConfirm(detailsMovie)}
+              >
+                Elimina
+              </Button>
+            </Box>
             {/* Lista episodi per le serie */}
             {detailsMovie.showtitle && !detailsMovie.season && !detailsMovie.episode && (
               <Box mt={3}>
@@ -604,6 +621,44 @@ function MainApp() {
           <img src={posterDialog.url} alt={posterDialog.title} style={{ width: '100%', maxWidth: 600, display: 'block', margin: '0 auto' }} />
         </Box>
       </Dialog>
+      {/* Dialog conferma eliminazione */}
+      <Dialog open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} maxWidth="xs" fullWidth>
+        <Box p={3}>
+          <Typography variant="h6" gutterBottom>Conferma eliminazione</Typography>
+          <Typography variant="body2" gutterBottom>
+            Eliminare <b>{deleteConfirm?.title || deleteConfirm?.originaltitle}</b> dal disco?
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', wordBreak: 'break-all', mb: 2 }}>
+            Verranno rimossi il file video, il file .nfo e le immagini associate.
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+            <Button variant="outlined" onClick={() => setDeleteConfirm(null)}>Annulla</Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={async () => {
+                try {
+                  await axios.delete(`${API_BASE}/api/movies/${deleteConfirm.id}`);
+                  setDeleteConfirm(null);
+                  setDetailsMovie(null);
+                  setEpisodes([]);
+                  fetchMovies();
+                } catch {
+                  setDeleteError(true);
+                  setDeleteConfirm(null);
+                }
+              }}
+            >
+              Elimina
+            </Button>
+          </Box>
+        </Box>
+      </Dialog>
+      <Snackbar open={deleteError} autoHideDuration={4000} onClose={() => setDeleteError(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert onClose={() => setDeleteError(false)} severity="error" sx={{ width: '100%' }}>
+          Errore durante l'eliminazione!
+        </Alert>
+      </Snackbar>
       <Snackbar open={refreshError} autoHideDuration={4000} onClose={() => setRefreshError(false)} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
         <Alert onClose={() => setRefreshError(false)} severity="error" sx={{ width: '100%' }}>
           Errore durante l'aggiornamento del database!
