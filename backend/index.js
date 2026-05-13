@@ -610,6 +610,8 @@ app.delete('/api/movies/:id', (req, res) => {
 });
 
 
+// Endpoint per salvare la configurazione (movieDirs)
+app.post('/api/setup', (req, res) => {
   const { movieDirs } = req.body;
   if (!Array.isArray(movieDirs) || movieDirs.length === 0) {
     return res.status(400).json({ error: 'movieDirs mancante o vuoto' });
