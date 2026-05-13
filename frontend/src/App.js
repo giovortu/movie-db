@@ -699,6 +699,8 @@ function MainApp() {
               ))}
             </select>
           </Box>
+        </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
           <Pagination
             count={Math.ceil(total / pageSize)}
             page={page}
