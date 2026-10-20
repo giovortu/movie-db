@@ -20,9 +20,38 @@ for (const envCandidate of [
   }
 }
 
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.BACKEND_PORT || process.env.PORT || '3001', 10);
 const NAS_ROOT = process.env.NAS_MOVIES_PATH || '\\\\storagepi\\NAS\\Movies';
+const NAS_DISPLAY_ROOT = process.env.NAS_DISPLAY_PATH || NAS_ROOT;
 const CACHE_FILE = path.join(__dirname, '..', 'data', 'library-cache.json');
+
+/**
+ * Converte automaticamente un percorso salvato in cache (es. \\storagepi\NAS\Movies\...)
+ * nel percorso locale effettivo del sistema/container corrente (es. /mnt/nas/movies/...)
+ */
+function toRuntimeNasPath(storedPath) {
+  if (!storedPath || typeof storedPath !== 'string') return '';
+  const prefixes = [
+    NAS_ROOT,
+    NAS_DISPLAY_ROOT,
+    '\\\\storagepi\\NAS\\Movies',
+    '//storagepi/NAS/Movies',
+    '/mnt/nas/movies',
+  ].filter(Boolean);
+
+  const normalizedStored = storedPath.replace(/\\/g, '/');
+  for (const pref of prefixes) {
+    const normPref = pref.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (
+      normalizedStored.toLowerCase() === normPref.toLowerCase() ||
+      normalizedStored.toLowerCase().startsWith(normPref.toLowerCase() + '/')
+    ) {
+      const rel = normalizedStored.slice(normPref.length).replace(/^\/+/, '');
+      return rel ? path.join(NAS_ROOT, ...rel.split('/')) : NAS_ROOT;
+    }
+  }
+  return storedPath;
+}
 
 const app = express();
 app.use(cors());
@@ -916,12 +945,13 @@ app.delete('/api/media/:id/video-file', async (req, res) => {
 
 // Streaming sicuro delle locandine e fanart dal NAS
 app.get('/api/image', (req, res) => {
-  const imgPath = req.query.path ? String(req.query.path) : '';
-  if (!imgPath) {
+  const rawImgPath = req.query.path ? String(req.query.path) : '';
+  if (!rawImgPath) {
     return res.status(400).send('Parametro path mancante');
   }
 
-  const normalizedReq = path.normalize(imgPath);
+  const resolvedImgPath = toRuntimeNasPath(rawImgPath);
+  const normalizedReq = path.normalize(resolvedImgPath);
   const normalizedRoot = path.normalize(NAS_ROOT);
 
   if (!normalizedReq.toLowerCase().startsWith(normalizedRoot.toLowerCase())) {

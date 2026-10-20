@@ -1,0 +1,43 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: movies-db-backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - NAS_MOVIES_PATH=/mnt/nas/movies
+      - NAS_DISPLAY_PATH=${NAS_MOVIES_PATH:-\\storagepi\NAS\Movies}
+    volumes:
+      # Monta la cartella film dal NAS (o dal path definito in .env) dentro il container
+      - type: bind
+        source: ${NAS_MOVIES_PATH:-\\storagepi\NAS\Movies}
+        target: /mnt/nas/movies
+      # Persiste la cache del database tra i riavvii del container
+      - ./backend/data:/app/data
+    expose:
+      - "3001"
+    ports:
+      - "${BACKEND_PORT:-3001}:3001"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: movies-db-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+
+# Opzionale: se esegui Docker su un host Linux senza mount locale, puoi usare direttamente un volume CIFS/SMB:
+# volumes:
+#   nas_movies:
+#     driver: local
+#     driver_opts:
+#       type: cifs
+#       o: "guest,vers=3.0,iocharset=utf8,file_mode=0777,dir_mode=0777"
+#       device: "//storagepi/NAS/Movies"

@@ -45,3 +45,16 @@ npm run dev
 npm run scan --prefix backend
 ```
 *(Per personalizzare il percorso NAS è possibile impostare la variabile d'ambiente `NAS_MOVIES_PATH`, di default impostata su `\\storagepi\NAS\Movies`).*
+
+---
+
+## Avvio con Docker Compose
+
+È possibile eseguire l'intero progetto tramite Docker Compose ([docker-compose.yml](docker-compose.yml)):
+
+```bash
+docker compose up -d --build
+```
+- **Frontend Web UI (Nginx + React)**: `http://localhost:8080`
+- **Backend API**: `http://localhost:3001`
+
