@@ -129,19 +129,27 @@ export function analyzeVideoFilename(videoPath, nasRoot, existingTvShows = []) {
     stem.match(/\b(\d{1,2})x(\d{2,3})\b/i);
   const cdPartMatch = stem.match(/\b(?:Cd|Parte?|Ep(?:isode)?)\s*(\d{1,2})\s*(?:di|of)\s*(\d{1,2})\b/i);
 
-  // Cerca se la cartella appartiene già a una Serie TV indicizzata
+  // Cerca se la cartella appartiene già a una Serie TV indicizzata.
+  // Confronto per confini di cartella; la radice del NAS (o un contenitore come "CD")
+  // non identifica mai una serie. Vince la cartella più specifica (più lunga).
   const seriesFolder = resolveSeriesRootFolder(nasRoot, dirPath);
-  const matchingShow = existingTvShows.find((s) => {
-    const folders = [
-      ...(s.folderPaths || []),
-      ...(s.folderPath ? [s.folderPath] : []),
-    ];
-    return folders.some(
-      (f) =>
-        dirPath.toLowerCase().startsWith(f.toLowerCase()) ||
-        f.toLowerCase() === seriesFolder.toLowerCase()
-    );
-  });
+  const norm = (p) => path.resolve(p).toLowerCase();
+  const rootNorm = norm(nasRoot);
+  const dirNorm = norm(dirPath);
+  const seriesNorm = norm(seriesFolder);
+  let matchingShow = null;
+  let bestLen = -1;
+  for (const s of existingTvShows) {
+    for (const f of [...(s.folderPaths || []), ...(s.folderPath ? [s.folderPath] : [])]) {
+      const fNorm = norm(f);
+      if (fNorm === rootNorm || !fNorm.startsWith(rootNorm)) continue;
+      const within = dirNorm === fNorm || dirNorm.startsWith(fNorm + path.sep);
+      if ((within || fNorm === seriesNorm) && fNorm.length > bestLen) {
+        matchingShow = s;
+        bestLen = fNorm.length;
+      }
+    }
+  }
 
   if (sxeMatch || cdPartMatch || matchingShow) {
     const season = sxeMatch ? parseInt(sxeMatch[1], 10) : 1;
@@ -298,7 +306,10 @@ export async function scanUnmatchedVideos(nasRoot, libraryItems = []) {
         existingStdNfoPath: stdParsed ? stdNfoPath : '',
         existingStdData: stdParsed?.data || null,
         detectedType: baseParsed?.kind === 'episodedetails' ? 'episode' : analysis.detectedType,
-        parsedTitle: baseParsed?.data?.title || analysis.parsedTitle,
+        parsedTitle:
+          (baseParsed?.kind === 'episodedetails'
+            ? baseParsed.data.showTitle
+            : baseParsed?.data?.title) || analysis.parsedTitle,
         parsedYear: baseParsed?.data?.year || analysis.parsedYear,
         season: baseParsed?.data?.season ?? analysis.season,
         episode: baseParsed?.data?.episode ?? analysis.episode,
