@@ -10,6 +10,8 @@ services:
       - PORT=3001
       - NAS_MOVIES_PATH=/mnt/nas/movies
       - NAS_DISPLAY_PATH=${NAS_MOVIES_PATH:-\\storagepi\NAS\Movies}
+      - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - TMDB_READ_ACCESS_TOKEN=${TMDB_READ_ACCESS_TOKEN:-}
     volumes:
       # Monta la cartella film dal NAS (o dal path definito in .env) dentro il container
       - type: bind

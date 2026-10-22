@@ -19,10 +19,12 @@ import {
   Wrench,
   CheckCircle2,
   ArrowUp,
+  FileQuestion,
 } from 'lucide-react';
 import MediaCard from './components/MediaCard.jsx';
 import MediaListRow from './components/MediaListRow.jsx';
 import MediaDetailModal from './components/MediaDetailModal.jsx';
+import UnmatchedMediaModal from './components/UnmatchedMediaModal.jsx';
 
 export default function App() {
   // View mode: 'card' | 'list'
@@ -59,6 +61,7 @@ export default function App() {
 
   // Active modal item
   const [selectedItem, setSelectedItem] = useState(null);
+  const [showUnmatchedModal, setShowUnmatchedModal] = useState(false);
 
   // Fix series state
   const [fixingSeries, setFixingSeries] = useState(false);
@@ -270,6 +273,16 @@ export default function App() {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowUnmatchedModal(true)}
+              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-semibold border bg-amber-500/15 hover:bg-amber-500/25 active:bg-amber-500/35 text-amber-300 border-amber-500/40 transition-all cursor-pointer"
+              title="Scansiona file video senza .archos.nfo e genera scheda compatibile Nova Video Player"
+            >
+              <FileQuestion className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span>Senza NFO</span>
+            </button>
+
             <button
               type="button"
               onClick={handleFixSeries}
@@ -883,6 +896,16 @@ export default function App() {
           onFilterStudio={(s) => {
             setSelectedStudio(s);
             setVisibleCount(60);
+          }}
+        />
+      )}
+
+      {/* Unmatched Media & Nova Video Player NFO Generator Modal */}
+      {showUnmatchedModal && (
+        <UnmatchedMediaModal
+          onClose={() => setShowUnmatchedModal(false)}
+          onChanged={async () => {
+            await Promise.all([fetchStatusAndFacets(), fetchMedia()]);
           }}
         />
       )}

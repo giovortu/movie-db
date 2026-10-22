@@ -3,9 +3,17 @@ import cors from 'cors';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { scanNasDirectory } from './scanner.js';
-import { fixSeriesInLibrary } from './seriesFixer.js';
+import { fixSeriesInLibrary, resolveSeriesRootFolder } from './seriesFixer.js';
+import {
+  getTmdbCredentials,
+  scanUnmatchedVideos,
+  searchTmdb,
+  fetchTmdbFullDetails,
+  writeNovaFilesToNas,
+} from './novaGenerator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -941,6 +949,325 @@ app.delete('/api/media/:id/video-file', async (req, res) => {
     deletedFiles,
     stats: library.stats,
   });
+});
+
+// Scansiona i file video non ancora associati a un file .archos.nfo valido
+app.get('/api/unmatched', async (_req, res) => {
+  try {
+    const creds = getTmdbCredentials();
+    const unmatched = await scanUnmatchedVideos(NAS_ROOT, library.items);
+    const missingNfoCount = unmatched.filter((x) => x.status === 'missing_nfo').length;
+    const missingArchosCount = unmatched.filter((x) => x.status === 'missing_archos').length;
+
+    res.json({
+      tmdbConfigured: creds.configured,
+      hasApiKey: Boolean(creds.apiKey),
+      hasReadAccessToken: Boolean(creds.readAccessToken),
+      total: unmatched.length,
+      missingNfoCount,
+      missingArchosCount,
+      items: unmatched,
+    });
+  } catch (err) {
+    console.error('[Unmatched] Errore scansione file senza NFO:', err);
+    res.status(500).json({ error: err.message || 'Errore scansione file senza NFO' });
+  }
+});
+
+// Ricerca su TMDb usando TMDB_API_KEY o TMDB_READ_ACCESS_TOKEN da .env
+app.get('/api/tmdb/search', async (req, res) => {
+  try {
+    const { q = '', year = '', type = 'movie' } = req.query;
+    if (!String(q).trim()) {
+      return res.json({ results: [] });
+    }
+    const results = await searchTmdb({
+      query: String(q).trim(),
+      year: year ? String(year).trim() : '',
+      type: String(type),
+    });
+    res.json({ results });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Recupera dettagli completi da TMDb per anteprima/modifica prima del salvataggio
+app.get('/api/tmdb/details', async (req, res) => {
+  try {
+    const { tmdbId = '', type = 'movie', season = '1', episode = '1' } = req.query;
+    if (!tmdbId) {
+      return res.status(400).json({ error: 'Parametro tmdbId mancante' });
+    }
+    const details = await fetchTmdbFullDetails({
+      tmdbId: String(tmdbId),
+      type: String(type),
+      season: parseInt(String(season), 10) || 1,
+      episode: parseInt(String(episode), 10) || 1,
+    });
+    res.json(details);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Genera il file .archos.nfo e le locandine compatibili con Nova Video Player sul NAS
+app.post('/api/unmatched/generate', async (req, res) => {
+  try {
+    const {
+      videoPath,
+      type = 'movie',
+      tmdbId = '',
+      season = 1,
+      episode = 1,
+      customMeta = null,
+    } = req.body || {};
+
+    const resolvedVideoPath = toRuntimeNasPath(videoPath);
+    if (!resolvedVideoPath || !isSafeNasPath(resolvedVideoPath)) {
+      return res.status(400).json({ error: 'Percorso file video non valido' });
+    }
+
+    let movieMeta = null;
+    let showMeta = null;
+    let episodeMeta = null;
+
+    if (tmdbId) {
+      const tmdbDetails = await fetchTmdbFullDetails({
+        tmdbId: String(tmdbId),
+        type,
+        season: Number(season) || 1,
+        episode: Number(episode) || 1,
+      });
+      movieMeta = tmdbDetails.movieMeta || null;
+      showMeta = tmdbDetails.showMeta || null;
+      episodeMeta = tmdbDetails.episodeMeta || null;
+    }
+
+    // Applica eventuali modifiche/campi personalizzati o usa customMeta per creazione manuale / conversione da .nfo standard
+    if (type === 'movie') {
+      movieMeta = {
+        ...(movieMeta || {}),
+        ...(customMeta || {}),
+      };
+      if (!movieMeta.title) {
+        return res.status(400).json({ error: 'Il titolo del film è obbligatorio' });
+      }
+    } else if (type === 'episode') {
+      episodeMeta = {
+        ...(episodeMeta || {}),
+        ...(customMeta || {}),
+        season: Number(customMeta?.season ?? season ?? episodeMeta?.season ?? 1),
+        episode: Number(customMeta?.episode ?? episode ?? episodeMeta?.episode ?? 1),
+      };
+      if (!episodeMeta.title) {
+        episodeMeta.title = `Episodio ${episodeMeta.episode}`;
+      }
+      if (customMeta?.showTitle && !episodeMeta.showTitle) {
+        episodeMeta.showTitle = customMeta.showTitle;
+      }
+      if (!showMeta && episodeMeta.showTitle) {
+        showMeta = {
+          title: episodeMeta.showTitle,
+          plot: episodeMeta.plot || '',
+          rating: episodeMeta.rating || null,
+          tmdbId: episodeMeta.tmdbId || '',
+          imdbId: episodeMeta.imdbId || '',
+          genres: customMeta?.genres || [],
+          actors: episodeMeta.actors || [],
+          posters: customMeta?.posterUrl ? [customMeta.posterUrl] : [],
+          backdrops: customMeta?.backdropUrl ? [customMeta.backdropUrl] : [],
+        };
+      }
+    }
+
+    const writeResult = await writeNovaFilesToNas({
+      videoPath: resolvedVideoPath,
+      type,
+      movieMeta,
+      showMeta,
+      episodeMeta,
+    });
+
+    // Aggiorna immediatamente il catalogo in memoria e la cache
+    let fileTimestampMs = Date.now();
+    try {
+      const st = await fs.stat(resolvedVideoPath);
+      fileTimestampMs = Math.round(st.mtimeMs || st.birthtimeMs || Date.now());
+    } catch {
+      // ignore
+    }
+    const fileDate = new Date(fileTimestampMs).toISOString();
+    const dirPath = path.dirname(resolvedVideoPath);
+    const ext = path.extname(resolvedVideoPath);
+
+    if (type === 'movie' && movieMeta) {
+      const newMovieId = crypto
+        .createHash('md5')
+        .update(`movie::${writeResult.nfoPath}`.toLowerCase())
+        .digest('hex')
+        .slice(0, 16);
+
+      const newMovieEntry = {
+        id: newMovieId,
+        type: 'movie',
+        title: movieMeta.title,
+        originalTitle: movieMeta.originalTitle || '',
+        tagline: '',
+        overview: movieMeta.outline || movieMeta.overview || '',
+        rating: movieMeta.rating ? Number(movieMeta.rating) : null,
+        criticRating: null,
+        year: movieMeta.year ? Number(movieMeta.year) : null,
+        premiered: '',
+        runtime: movieMeta.runtime ? Number(movieMeta.runtime) : null,
+        mpaa: movieMeta.mpaa || '',
+        imdbId: movieMeta.imdbId || '',
+        tmdbId: movieMeta.tmdbId || '',
+        directors: movieMeta.directors || [],
+        writers: movieMeta.writers || [],
+        genres: movieMeta.genres || [],
+        studios: movieMeta.studios || [],
+        countries: [],
+        tags: [],
+        actors: movieMeta.actors || [],
+        trailers: [],
+        posterPath: fsSync.existsSync(writeResult.posterPath) ? writeResult.posterPath : '',
+        fanartPath: fsSync.existsSync(writeResult.fanartPath) ? writeResult.fanartPath : '',
+        logoPath: '',
+        remotePoster: movieMeta.posterUrl || movieMeta.posters?.[0] || '',
+        remoteFanart: movieMeta.backdropUrl || movieMeta.backdrops?.[0] || '',
+        folderPath: dirPath,
+        nfoPath: writeResult.nfoPath,
+        hasArchosNfo: true,
+        videoPath: resolvedVideoPath,
+        videoFileName: path.basename(resolvedVideoPath),
+        videoFormat: ext.slice(1).toUpperCase(),
+        dateAdded: fileDate,
+        fileTimestampMs,
+        fileDate,
+      };
+
+      const existingIdx = library.items.findIndex(
+        (x) =>
+          x.id === newMovieId ||
+          (x.videoPath && x.videoPath.toLowerCase() === resolvedVideoPath.toLowerCase())
+      );
+      if (existingIdx !== -1) {
+        library.items[existingIdx] = newMovieEntry;
+      } else {
+        library.items.push(newMovieEntry);
+      }
+    } else if (type === 'episode' && episodeMeta) {
+      const seriesRoot = resolveSeriesRootFolder(NAS_ROOT, dirPath);
+      let show = library.items.find(
+        (x) =>
+          x.type === 'tvshow' &&
+          ((showMeta?.tmdbId && String(x.tmdbId) === String(showMeta.tmdbId)) ||
+            (x.folderPath && x.folderPath.toLowerCase() === seriesRoot.toLowerCase()) ||
+            (episodeMeta.showTitle &&
+              x.title.toLowerCase() === episodeMeta.showTitle.toLowerCase()))
+      );
+
+      const newEp = {
+        id: crypto
+          .createHash('md5')
+          .update(`ep::${writeResult.nfoPath}`.toLowerCase())
+          .digest('hex')
+          .slice(0, 16),
+        title: episodeMeta.title,
+        season: Number(episodeMeta.season) || 1,
+        episode: Number(episodeMeta.episode) || 1,
+        overview: episodeMeta.plot || '',
+        rating: episodeMeta.rating ? Number(episodeMeta.rating) : null,
+        aired: episodeMeta.aired || '',
+        runtime: null,
+        directors: episodeMeta.directors || [],
+        writers: episodeMeta.writers || [],
+        videoPath: resolvedVideoPath,
+        videoFileName: path.basename(resolvedVideoPath),
+        nfoPath: writeResult.nfoPath,
+        fileTimestampMs,
+        fileDate,
+      };
+
+      if (!show) {
+        const showId = crypto
+          .createHash('md5')
+          .update(`tvshow::${seriesRoot}`.toLowerCase())
+          .digest('hex')
+          .slice(0, 16);
+        show = {
+          id: showId,
+          type: 'tvshow',
+          title: showMeta?.title || episodeMeta.showTitle || path.basename(seriesRoot),
+          originalTitle: '',
+          tagline: '',
+          overview: showMeta?.plot || '',
+          rating: showMeta?.rating ? Number(showMeta.rating) : null,
+          criticRating: null,
+          year: showMeta?.year || null,
+          premiered: showMeta?.premiered || '',
+          runtime: null,
+          mpaa: showMeta?.mpaa || '',
+          imdbId: showMeta?.imdbId || '',
+          tmdbId: showMeta?.tmdbId || '',
+          directors: episodeMeta.directors || [],
+          writers: episodeMeta.writers || [],
+          genres: showMeta?.genres || [],
+          studios: showMeta?.studios || [],
+          countries: [],
+          tags: [],
+          actors: showMeta?.actors || [],
+          trailers: [],
+          posterPath: '',
+          fanartPath: '',
+          logoPath: '',
+          remotePoster: showMeta?.posters?.[0] || '',
+          remoteFanart: showMeta?.backdrops?.[0] || '',
+          folderPath: seriesRoot,
+          folderPaths: [seriesRoot],
+          nfoPath: writeResult.nfoPath,
+          hasArchosNfo: true,
+          dateAdded: fileDate,
+          fileTimestampMs,
+          fileDate,
+          episodes: [newEp],
+          seasonCount: 1,
+          episodeCount: 1,
+        };
+        library.items.push(show);
+      } else {
+        show.episodes = (show.episodes || []).filter(
+          (e) =>
+            e.id !== newEp.id &&
+            (!e.videoPath || e.videoPath.toLowerCase() !== resolvedVideoPath.toLowerCase())
+        );
+        show.episodes.push(newEp);
+        show.episodes.sort((a, b) => a.season - b.season || a.episode - b.episode);
+        const seasonsSet = new Set(show.episodes.map((e) => e.season).filter((s) => s > 0));
+        show.seasonCount = seasonsSet.size || 1;
+        show.episodeCount = show.episodes.length;
+        if (fileTimestampMs > (show.fileTimestampMs || 0)) {
+          show.fileTimestampMs = fileTimestampMs;
+          show.fileDate = fileDate;
+        }
+      }
+    }
+
+    updateLibraryStats();
+    await saveCache(library);
+
+    res.json({
+      message: `File .archos.nfo e locandine Nova Video Player creati con successo per "${
+        movieMeta?.title || episodeMeta?.title
+      }".`,
+      createdFiles: writeResult.createdFiles,
+      stats: library.stats,
+    });
+  } catch (err) {
+    console.error('[GenerateNova] Errore:', err);
+    res.status(500).json({ error: err.message || 'Errore creazione file .archos.nfo' });
+  }
 });
 
 // Streaming sicuro delle locandine e fanart dal NAS
