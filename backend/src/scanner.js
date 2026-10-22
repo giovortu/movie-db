@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseNfoContent, mergeNfoData } from './nfoParser.js';
 
-const VIDEO_EXTENSIONS = new Set([
+export const VIDEO_EXTENSIONS = new Set([
   '.mkv',
   '.mp4',
   '.avi',
@@ -12,12 +12,49 @@ const VIDEO_EXTENSIONS = new Set([
   '.wmv',
   '.ts',
   '.m2ts',
+  '.mts',
   '.iso',
   '.webm',
   '.mpg',
   '.mpeg',
+  '.mpe',
+  '.mp2',
+  '.mpv',
+  '.mpv2',
+  '.mp2v',
+  '.m2v',
   '.flv',
+  '.f4v',
   '.divx',
+  '.xvid',
+  '.ogv',
+  '.ogm',
+  '.ogg',
+  '.vob',
+  '.ifo',
+  '.3gp',
+  '.3g2',
+  '.asf',
+  '.rm',
+  '.rmvb',
+  '.tp',
+  '.trp',
+  '.evo',
+  '.dat',
+  '.nsv',
+  '.wtv',
+  '.dvr-ms',
+  '.mk3d',
+  '.qt',
+  '.viv',
+  '.h264',
+  '.h265',
+  '.hevc',
+  '.av1',
+  '.vp9',
+  '.bivx',
+  '.pva',
+  '.nuv',
 ]);
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
@@ -117,9 +154,9 @@ function getNfoStem(fileName) {
  * Cleans up a raw filename or folder name into a human-readable title and optional year
  */
 export function parseCleanFilename(rawName) {
-  const base = rawName
-    .replace(/\.(mkv|mp4|avi|m4v|mov|wmv|ts|iso|webm|divx)$/i, '')
-    .replace(/^\[[^\]]+\]\s*/, '');
+  const ext = path.extname(rawName).toLowerCase();
+  const withoutExt = VIDEO_EXTENSIONS.has(ext) ? rawName.slice(0, -ext.length) : rawName;
+  const base = withoutExt.replace(/^\[[^\]]+\]\s*/, '');
   const yearMatch = base.match(/[\(\[\.\s](19\d{2}|20\d{2})[\)\]\.\s]/);
   let year = yearMatch ? parseInt(yearMatch[1], 10) : null;
   let titlePart = yearMatch ? base.slice(0, yearMatch.index) : base;

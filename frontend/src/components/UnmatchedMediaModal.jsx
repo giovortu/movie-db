@@ -263,6 +263,7 @@ export default function UnmatchedMediaModal({ onClose, onCatalogUpdated }) {
   const filteredItems = data.items.filter((item) => {
     if (filterTab === 'missing_nfo') return item.status === 'missing_nfo';
     if (filterTab === 'missing_archos') return item.status === 'missing_archos';
+    if (filterTab === 'incomplete_nfo') return item.status === 'incomplete_nfo';
     return true;
   });
 
@@ -367,6 +368,19 @@ export default function UnmatchedMediaModal({ onClose, onCatalogUpdated }) {
                 Da convertire in .archos ({data.missingArchosCount})
               </button>
             )}
+            {data.incompleteCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilterTab('incomplete_nfo')}
+                className={`px-2.5 py-1 rounded text-[11px] font-semibold cursor-pointer ${
+                  filterTab === 'incomplete_nfo'
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                NFO incompleti ({data.incompleteCount})
+              </button>
+            )}
           </div>
         </div>
 
@@ -462,6 +476,11 @@ export default function UnmatchedMediaModal({ onClose, onCatalogUpdated }) {
                           {item.status === 'missing_archos' && (
                             <span className="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 text-[10px] font-medium">
                               Ha già .nfo standard (convertibile in 1 click)
+                            </span>
+                          )}
+                          {item.status === 'incomplete_nfo' && (
+                            <span className="px-2 py-0.5 rounded bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[10px] font-medium">
+                              .archos.nfo senza trama/ID (da completare)
                             </span>
                           )}
                         </div>

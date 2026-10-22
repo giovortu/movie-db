@@ -3,28 +3,11 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseNfoContent } from './nfoParser.js';
-import { parseCleanFilename } from './scanner.js';
+import { parseCleanFilename, VIDEO_EXTENSIONS } from './scanner.js';
 import { resolveSeriesRootFolder } from './seriesFixer.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const VIDEO_EXTENSIONS = new Set([
-  '.mkv',
-  '.mp4',
-  '.avi',
-  '.m4v',
-  '.mov',
-  '.wmv',
-  '.ts',
-  '.m2ts',
-  '.iso',
-  '.webm',
-  '.mpg',
-  '.mpeg',
-  '.flv',
-  '.divx',
-]);
 
 const IGNORED_DIRS = new Set([
   'subs',
@@ -225,7 +208,7 @@ export async function scanUnmatchedVideos(nasRoot, libraryItems = []) {
   const existingTvShows = libraryItems.filter((x) => x.type === 'tvshow');
 
   async function walk(currentDir, depth = 0) {
-    if (depth > 4) return;
+    if (depth > 12) return;
     let entries;
     try {
       entries = await fs.readdir(currentDir, { withFileTypes: true });
@@ -247,7 +230,8 @@ export async function scanUnmatchedVideos(nasRoot, libraryItems = []) {
         const lower = entry.name.toLowerCase();
         fileMap.set(lower, fullPath);
         const ext = path.extname(lower);
-        if (VIDEO_EXTENSIONS.has(ext)) {
+        // Ignora file nascosti/temporanei (es. ".nome.mkv.resume")
+        if (!lower.startsWith('.') && VIDEO_EXTENSIONS.has(ext)) {
           videos.push({ name: entry.name, fullPath, ext });
         }
       }
@@ -259,17 +243,25 @@ export async function scanUnmatchedVideos(nasRoot, libraryItems = []) {
       const archosNfoPath = fileMap.get(`${stemLower}.archos.nfo`);
       const stdNfoPath = fileMap.get(`${stemLower}.nfo`) || fileMap.get('movie.nfo');
 
-      let hasValidArchosXml = false;
+      let archosParsed = null;
       if (archosNfoPath) {
         try {
           const raw = await fs.readFile(archosNfoPath, 'utf8');
-          if (parseNfoContent(raw)) hasValidArchosXml = true;
+          archosParsed = parseNfoContent(raw);
         } catch {
           // ignore
         }
       }
 
-      if (hasValidArchosXml) continue;
+      // .archos.nfo presente ma povero di informazioni (nessuna trama, nessun ID/anno)
+      let isIncomplete = false;
+      if (archosParsed) {
+        const d = archosParsed.data || {};
+        const noPlot = !String(d.overview || '').trim();
+        const noIds = archosParsed.kind !== 'episodedetails' && !d.tmdbId && !d.imdbId && !d.year;
+        isIncomplete = noPlot || noIds;
+        if (!isIncomplete) continue;
+      }
 
       // Controlla se esiste almeno un .nfo standard XML valido (es. Jellyfin/Kodi)
       let stdParsed = null;
@@ -292,21 +284,24 @@ export async function scanUnmatchedVideos(nasRoot, libraryItems = []) {
 
       const analysis = analyzeVideoFilename(v.fullPath, nasRoot, existingTvShows);
 
+      // Per un .archos.nfo incompleto usa i suoi dati (titolo, anno, S/E) come base
+      const baseParsed = stdParsed || archosParsed;
+
       unmatched.push({
         videoPath: v.fullPath,
         fileName: v.name,
         dirPath: currentDir,
         stem,
         sizeBytes,
-        status: stdParsed ? 'missing_archos' : 'missing_nfo',
+        status: isIncomplete ? 'incomplete_nfo' : stdParsed ? 'missing_archos' : 'missing_nfo',
         hasSceneNfo: Boolean(stdNfoPath && !stdParsed),
         existingStdNfoPath: stdParsed ? stdNfoPath : '',
         existingStdData: stdParsed?.data || null,
-        detectedType: stdParsed?.kind === 'episodedetails' ? 'episode' : analysis.detectedType,
-        parsedTitle: stdParsed?.data?.title || analysis.parsedTitle,
-        parsedYear: stdParsed?.data?.year || analysis.parsedYear,
-        season: stdParsed?.data?.season ?? analysis.season,
-        episode: stdParsed?.data?.episode ?? analysis.episode,
+        detectedType: baseParsed?.kind === 'episodedetails' ? 'episode' : analysis.detectedType,
+        parsedTitle: baseParsed?.data?.title || analysis.parsedTitle,
+        parsedYear: baseParsed?.data?.year || analysis.parsedYear,
+        season: baseParsed?.data?.season ?? analysis.season,
+        episode: baseParsed?.data?.episode ?? analysis.episode,
         matchedShow: analysis.matchedShow,
       });
     }

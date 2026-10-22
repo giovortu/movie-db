@@ -958,6 +958,7 @@ app.get('/api/unmatched', async (_req, res) => {
     const unmatched = await scanUnmatchedVideos(NAS_ROOT, library.items);
     const missingNfoCount = unmatched.filter((x) => x.status === 'missing_nfo').length;
     const missingArchosCount = unmatched.filter((x) => x.status === 'missing_archos').length;
+    const incompleteCount = unmatched.filter((x) => x.status === 'incomplete_nfo').length;
 
     res.json({
       tmdbConfigured: creds.configured,
@@ -966,6 +967,7 @@ app.get('/api/unmatched', async (_req, res) => {
       total: unmatched.length,
       missingNfoCount,
       missingArchosCount,
+      incompleteCount,
       items: unmatched,
     });
   } catch (err) {
